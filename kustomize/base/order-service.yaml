@@ -16,12 +16,12 @@ spec:
       - name: order-service
         image: order-service:latest
         ports:
-        - containerPort: 3000
+        - containerPort: 3002
         env:
         - name: NODE_ENV
           value: "production"
         - name: PORT
-          value: "3000"
+          value: "3002"
         - name: DB_HOST
           value: "postgres-service"
         - name: DB_PORT
@@ -53,13 +53,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 3000
+            port: 3002
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
-            port: 3000
+            port: 3002
           initialDelaySeconds: 10
           periodSeconds: 5
 ---
@@ -71,6 +71,6 @@ spec:
   selector:
     app: order-service
   ports:
-  - port: 3000
-    targetPort: 3000
+  - port: 3002
+    targetPort: 3002
   type: ClusterIP

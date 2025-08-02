@@ -15,28 +15,58 @@ services:
     ports: ["8123:8123"]
 
   gaming-service:
-    image: lugx-gaming-service:local
-    ports: ["3001:3000"]
+    build: ./services/gaming-service
+    ports: ["3001:3001"]
     environment:
-      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: lugx_gaming
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      JWT_SECRET: dev-jwt-secret-key
+      CORS_ORIGIN: "*"
     depends_on: [postgres]
 
   order-service:
-    image: lugx-order-service:local
-    ports: ["3002:3000"]
+    build: ./services/order-service
+    ports: ["3002:3002"]
     environment:
-      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
+      NODE_ENV: development
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: lugx_gaming
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      STRIPE_SECRET_KEY: sk_test_your_stripe_key_here
+      GAMING_SERVICE_URL: http://gaming-service:3001
     depends_on: [postgres]
 
   analytics-service:
-    image: lugx-analytics-service:local
-    ports: ["3003:3000"]
+    build: ./services/analytics-service
+    ports: ["3003:3003"]
     environment:
-      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
+      NODE_ENV: development
+      PORT: 3003
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: lugx_gaming
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
       CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DATABASE: analytics
     depends_on: [postgres, clickhouse]
 
   frontend:
-    image: lugx-frontend:local
-    ports: ["3000:80"]
+    build: ./services/frontend
+    ports: ["8080:80"]
+    environment:
+      REACT_APP_API_URL: http://localhost:8080
+      REACT_APP_GAMING_SERVICE_URL: http://localhost:3001
+      REACT_APP_ORDER_SERVICE_URL: http://localhost:3002
+      REACT_APP_ANALYTICS_SERVICE_URL: http://localhost:3003
     depends_on: [gaming-service, order-service, analytics-service]

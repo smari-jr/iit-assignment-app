@@ -46,8 +46,7 @@ print_banner() {
     echo -e "  🐳 Docker & Docker Compose"
     echo -e "  ☁️  AWS CLI v2"
     echo -e "  ☸️  Kubernetes (kubectl, kustomize, helm)"
-    echo -e "  🐍 Python 3.11 & pip"
-    echo -e "  📦 Node.js & npm"
+    echo -e "   Node.js & npm"
     echo -e "  🔧 Development tools"
     echo ""
 }
@@ -155,7 +154,6 @@ install_aws_cli() {
     
     # Remove any existing AWS CLI v1
     sudo yum remove -y awscli 2>/dev/null || true
-    sudo pip uninstall -y awscli 2>/dev/null || true
     
     # Download and install AWS CLI v2
     cd /tmp
@@ -175,66 +173,6 @@ install_aws_cli() {
     
     # Clean up
     rm -rf /tmp/aws /tmp/awscliv2.zip
-}
-
-# Install Python 3.11
-install_python() {
-    log "Installing Python 3.11..."
-    
-    if [[ "$AL_VERSION" == "2023" ]]; then
-        # Amazon Linux 2023 approach
-        sudo yum install -y python3.11 python3.11-pip python3.11-devel
-        sudo alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-        sudo alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.11 1
-    else
-        # Amazon Linux 2 approach
-        sudo amazon-linux-extras install -y python3.8
-        sudo yum install -y python3-pip python3-devel
-        
-        # Install Python 3.11 from source if needed
-        if ! python3.11 --version &>/dev/null; then
-            log "Building Python 3.11 from source..."
-            cd /tmp
-            wget https://www.python.org/ftp/python/3.11.8/Python-3.11.8.tgz
-            tar xzf Python-3.11.8.tgz
-            cd Python-3.11.8
-            ./configure --enable-optimizations --prefix=/usr/local/python3.11
-            make -j$(nproc)
-            sudo make altinstall
-            
-            # Create symlinks
-            sudo ln -sf /usr/local/python3.11/bin/python3.11 /usr/local/bin/python3.11
-            sudo ln -sf /usr/local/python3.11/bin/pip3.11 /usr/local/bin/pip3.11
-            
-            # Clean up
-            cd /
-            rm -rf /tmp/Python-3.11.8*
-        fi
-    fi
-    
-    # Install common Python packages
-    log "Installing common Python packages..."
-    pip3 install --user --upgrade pip setuptools wheel
-    pip3 install --user \
-        requests \
-        boto3 \
-        pyyaml \
-        jinja2 \
-        ansible \
-        docker-compose
-    
-    # Verify installation
-    if python3 --version &>/dev/null; then
-        success "Python 3 installed successfully: $(python3 --version)"
-    else
-        error "Python 3 installation failed"
-    fi
-    
-    if pip3 --version &>/dev/null; then
-        success "pip3 installed successfully: $(pip3 --version)"
-    else
-        error "pip3 installation failed"
-    fi
 }
 
 # Install Node.js and npm
@@ -481,13 +419,6 @@ verify_installations() {
         echo -e "❌ AWS CLI: Not installed or not working"
     fi
     
-    # Python
-    if python3 --version &>/dev/null; then
-        echo -e "✅ Python: $(python3 --version)"
-    else
-        echo -e "❌ Python: Not installed or not working"
-    fi
-    
     # Node.js
     if node --version &>/dev/null; then
         echo -e "✅ Node.js: $(node --version)"
@@ -580,7 +511,6 @@ main() {
     update_system
     install_docker
     install_aws_cli
-    install_python
     install_nodejs
     install_kubernetes_tools
     install_dev_tools

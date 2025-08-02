@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: lugx_gaming
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports: ["5432:5432"]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23
+    environment:
+      CLICKHOUSE_PASSWORD: clickhouse123
+    ports: ["8123:8123"]
+
+  gaming-service:
+    image: lugx-gaming-service:local
+    ports: ["3001:3000"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
+    depends_on: [postgres]
+
+  order-service:
+    image: lugx-order-service:local
+    ports: ["3002:3000"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
+    depends_on: [postgres]
+
+  analytics-service:
+    image: lugx-analytics-service:local
+    ports: ["3003:3000"]
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
+      CLICKHOUSE_URL: http://clickhouse:8123
+    depends_on: [postgres, clickhouse]
+
+  frontend:
+    image: lugx-frontend:local
+    ports: ["3000:80"]
+    depends_on: [gaming-service, order-service, analytics-service]

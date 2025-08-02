@@ -1,0 +1,153 @@
+version: '3.8'
+
+services:
+  # Frontend Service
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_GAMING_API_URL=http://localhost:3001
+      - REACT_APP_ORDER_API_URL=http://localhost:3002
+      - REACT_APP_ANALYTICS_API_URL=http://localhost:3003
+    networks:
+      - lugx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Gaming Service
+  gaming-service:
+    build:
+      context: ./services/gaming-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=lugx_gaming
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev_jwt_secret_for_assignment
+    depends_on:
+      - postgres
+    networks:
+      - lugx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/products"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Order Service
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=lugx_gaming
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - JWT_SECRET=dev_jwt_secret_for_assignment
+    depends_on:
+      - postgres
+    networks:
+      - lugx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/orders"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Analytics Service
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=lugx_gaming
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres123
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DATABASE=analytics
+      - CLICKHOUSE_USERNAME=default
+      - CLICKHOUSE_PASSWORD=clickhouse123
+      - JWT_SECRET=dev_jwt_secret_for_assignment
+    depends_on:
+      - postgres
+      - clickhouse
+    networks:
+      - lugx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/analytics/dashboard"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=lugx_gaming
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lugx-network
+    restart: unless-stopped
+
+  # ClickHouse Database
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      - CLICKHOUSE_DB=analytics
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - CLICKHOUSE_PASSWORD=clickhouse123
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - lugx-network
+    restart: unless-stopped
+
+networks:
+  lugx-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  clickhouse_data:

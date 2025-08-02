@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: lugx-gaming
+
+resources:
+- ../../base
+
+patchesStrategicMerge:
+- config-patch.yaml
+
+commonLabels:
+  environment: development
+  app.kubernetes.io/instance: dev
+
+images:
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/frontend
+  newTag: dev
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/gaming-service
+  newTag: dev
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/order-service
+  newTag: dev
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/analytics-service
+  newTag: dev
+
+replicas:
+- name: frontend
+  count: 1
+- name: gaming-service
+  count: 1
+- name: order-service
+  count: 1
+- name: analytics-service
+  count: 1

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: lugx-gaming
+data:
+  NODE_ENV: "development"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "lugx_gaming_dev"
+  CLICKHOUSE_HOST: "clickhouse-service"
+  CLICKHOUSE_PORT: "8123"
+  CLICKHOUSE_DATABASE: "analytics_dev"
+  CLICKHOUSE_USERNAME: "default"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: lugx-gaming
+type: Opaque
+stringData:
+  DB_USER: "postgres"
+  DB_PASSWORD: "dev_password"
+  CLICKHOUSE_PASSWORD: "dev_clickhouse_password"
+  JWT_SECRET: "dev-jwt-secret-for-testing"

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lugx Gaming Analytics Integration Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #c0392b;
+        }
+        .analytics-info {
+            background-color: #34495e;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .code {
+            background-color: #1e1e1e;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Lugx Gaming Analytics Integration</h1>
+        <p>This page demonstrates how to integrate the Lugx Analytics service with your gaming platform.</p>
+        
+        <div class="analytics-info">
+            <h3>📊 Current Session Info:</h3>
+            <p><strong>Session ID:</strong> <span id="session-id">Loading...</span></p>
+            <p><strong>User ID:</strong> <span id="user-id">Not set</span></p>
+            <p><strong>Page:</strong> <span id="current-page">Loading...</span></p>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🎯 Track Events</h2>
+        <p>Click the buttons below to track different types of events:</p>
+        
+        <button onclick="trackGameEvent()">🎮 Game Started</button>
+        <button onclick="trackPurchaseEvent()">💰 Purchase Made</button>
+        <button onclick="trackUserAction()">👤 User Action</button>
+        <button onclick="trackCustomEvent()">⚡ Custom Event</button>
+        
+        <div id="event-log" style="margin-top: 20px;">
+            <h3>📝 Event Log:</h3>
+            <div id="events" style="max-height: 200px; overflow-y: auto; background-color: #1e1e1e; padding: 10px; border-radius: 5px;">
+                <!-- Events will be logged here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>⚙️ Integration Code</h2>
+        <p>To integrate analytics into your React/JavaScript application:</p>
+        
+        <h3>1. Include the Analytics Script:</h3>
+        <div class="code">&lt;script src="/analytics/lugx-analytics.js"&gt;&lt;/script&gt;</div>
+        
+        <h3>2. Initialize Analytics:</h3>
+        <div class="code">// Initialize with your analytics service URL
+const analytics = new LugxAnalytics({
+    analyticsUrl: 'http://your-analytics-service:3003/analytics',
+    userId: 'user123', // Set when user logs in
+    autoTrack: true     // Automatically track page views
+});</div>
+
+        <h3>3. Track Events:</h3>
+        <div class="code">// Track gaming events
+analytics.trackGameEvent('game_started', {
+    game_id: 'game123',
+    game_name: 'Call of Duty',
+    level: 1
+});
+
+// Track purchase events
+analytics.trackPurchaseEvent('purchase_completed', {
+    item_id: 'game456',
+    price: 59.99,
+    currency: 'USD'
+});
+
+// Track custom events
+analytics.trackEvent('user_action', 'button_click', {
+    button_name: 'play_game',
+    location: 'homepage'
+});</div>
+    </div>
+
+    <div class="container">
+        <h2>📈 Analytics Endpoints</h2>
+        <p>The analytics service provides the following endpoints:</p>
+        
+        <div class="code">POST /analytics/track/page-visit  - Track page visits
+POST /analytics/track/event       - Track custom events
+GET  /analytics/page-visits       - Get page visit analytics
+GET  /analytics/dashboard         - Get dashboard data</div>
+    </div>
+
+    <!-- Analytics Script -->
+    <script>
+        // Set the analytics URL to point to your service
+        window.ANALYTICS_URL = 'http://localhost:3003/analytics';
+    </script>
+    <script src="lugx-analytics.js"></script>
+    
+    <script>
+        // Update UI with session info
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('session-id').textContent = window.lugxAnalytics.sessionId;
+            document.getElementById('current-page').textContent = window.location.pathname;
+            
+            // Simulate logged-in user
+            setTimeout(() => {
+                window.lugxAnalytics.setUserId('demo_user_123');
+                document.getElementById('user-id').textContent = 'demo_user_123';
+            }, 1000);
+        });
+
+        // Event tracking functions
+        function trackGameEvent() {
+            window.lugxAnalytics.trackGameEvent('game_started', {
+                game_id: 'call_of_duty_mw',
+                game_name: 'Call of Duty: Modern Warfare',
+                level: 1,
+                difficulty: 'normal'
+            });
+            logEvent('🎮 Game Started', 'Tracked game_started event');
+        }
+
+        function trackPurchaseEvent() {
+            window.lugxAnalytics.trackPurchaseEvent('purchase_completed', {
+                item_id: 'game_456',
+                item_name: 'Cyberpunk 2077',
+                price: 59.99,
+                currency: 'USD',
+                category: 'games'
+            });
+            logEvent('💰 Purchase Made', 'Tracked purchase_completed event');
+        }
+
+        function trackUserAction() {
+            window.lugxAnalytics.trackUserAction('button_click', {
+                button_name: 'demo_button',
+                page: window.location.pathname,
+                timestamp: new Date().toISOString()
+            });
+            logEvent('👤 User Action', 'Tracked button_click event');
+        }
+
+        function trackCustomEvent() {
+            window.lugxAnalytics.trackEvent('demo', 'custom_interaction', {
+                interaction_type: 'demo_click',
+                value: Math.floor(Math.random() * 100),
+                browser: navigator.userAgent.includes('Chrome') ? 'Chrome' : 'Other'
+            });
+            logEvent('⚡ Custom Event', 'Tracked custom_interaction event');
+        }
+
+        function logEvent(title, description) {
+            const eventsContainer = document.getElementById('events');
+            const eventElement = document.createElement('div');
+            eventElement.style.marginBottom = '10px';
+            eventElement.style.padding = '8px';
+            eventElement.style.backgroundColor = '#2a2a2a';
+            eventElement.style.borderRadius = '3px';
+            eventElement.innerHTML = `
+                <strong>${title}</strong><br>
+                <small>${description}</small><br>
+                <small style="color: #888;">${new Date().toLocaleTimeString()}</small>
+            `;
+            eventsContainer.insertBefore(eventElement, eventsContainer.firstChild);
+            
+            // Keep only last 10 events
+            while (eventsContainer.children.length > 10) {
+                eventsContainer.removeChild(eventsContainer.lastChild);
+            }
+        }
+
+        // Track some demo events on page load
+        setTimeout(() => {
+            window.lugxAnalytics.trackEvent('page', 'demo_page_loaded', {
+                demo: true,
+                load_time: Date.now()
+            });
+            logEvent('📄 Page Loaded', 'Automatically tracked page load');
+        }, 2000);
+    </script>
+</body>
+</html>

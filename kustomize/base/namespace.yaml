@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lugx-gaming
+  labels:
+    name: lugx-gaming
+    app.kubernetes.io/name: lugx-gaming
+    app.kubernetes.io/instance: production

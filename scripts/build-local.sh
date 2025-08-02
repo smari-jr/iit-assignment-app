@@ -81,44 +81,81 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
+    container_name: postgres
     environment:
       POSTGRES_DB: lugx_gaming
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres123
     ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   clickhouse:
     image: clickhouse/clickhouse-server:23
+    container_name: clickhouse
     environment:
       CLICKHOUSE_PASSWORD: clickhouse123
     ports: ["8123:8123"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   gaming-service:
     image: lugx-gaming-service:local
+    container_name: gaming-service
     ports: ["3001:3000"]
     environment:
       DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
-    depends_on: [postgres]
+      DB_HOST: postgres
+      DB_PASSWORD: postgres123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   order-service:
     image: lugx-order-service:local
+    container_name: order-service
     ports: ["3002:3000"]
     environment:
       DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
-    depends_on: [postgres]
+      DB_HOST: postgres
+      DB_PASSWORD: postgres123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   analytics-service:
     image: lugx-analytics-service:local
+    container_name: analytics-service
     ports: ["3003:3000"]
     environment:
       DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/lugx_gaming
       CLICKHOUSE_URL: http://clickhouse:8123
-    depends_on: [postgres, clickhouse]
+      DB_HOST: postgres
+      DB_PASSWORD: postgres123
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     image: lugx-frontend:local
+    container_name: frontend
     ports: ["3000:80"]
-    depends_on: [gaming-service, order-service, analytics-service]
+    depends_on:
+      - gaming-service
+      - order-service
+      - analytics-service
+    restart: unless-stopped
 EOF
 
 # Start services

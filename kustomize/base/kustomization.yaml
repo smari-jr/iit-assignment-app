@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - secrets.yaml
-  - config.yaml
   - postgres.yaml
   - clickhouse.yaml
   - frontend.yaml

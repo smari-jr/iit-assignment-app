@@ -29,6 +29,13 @@ warn() {
 
 error() {
     echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
+    echo -e "${RED}Current directory: $(pwd)${NC}"
+    echo -e "${RED}Required structure:${NC}"
+    echo -e "${RED}  - services/frontend/${NC}"
+    echo -e "${RED}  - services/gaming-service/${NC}"
+    echo -e "${RED}  - services/order-service/${NC}"
+    echo -e "${RED}  - services/analytics-service/${NC}"
+    echo -e "${RED}  - kustomize/base/${NC}"
     exit 1
 }
 
@@ -36,12 +43,38 @@ error() {
 check_prerequisites() {
     log "Checking prerequisites..."
     
+    # Check if we're in the right directory
+    if [[ ! -d "services" ]]; then
+        error "Services directory not found. Please run this script from the project root directory."
+    fi
+    
+    # Check if all service directories exist
+    local services=("frontend" "gaming-service" "order-service" "analytics-service")
+    for service in "${services[@]}"; do
+        if [[ ! -d "services/${service}" ]]; then
+            error "Service directory 'services/${service}' not found."
+        fi
+        if [[ ! -f "services/${service}/Dockerfile" ]]; then
+            error "Dockerfile not found in 'services/${service}/'."
+        fi
+    done
+    
+    # Check if kustomize directory exists
+    if [[ ! -d "kustomize/base" ]]; then
+        error "Kustomize directory 'kustomize/base' not found."
+    fi
+    
     if ! command -v aws &> /dev/null; then
         error "AWS CLI not found. Please install AWS CLI."
     fi
     
     if ! command -v docker &> /dev/null; then
         error "Docker not found. Please install Docker."
+    fi
+    
+    # Check Docker permissions
+    if ! docker ps &> /dev/null; then
+        error "Docker permission denied. Please run: sudo usermod -aG docker \$USER && newgrp docker"
     fi
     
     if ! command -v kubectl &> /dev/null; then
@@ -74,8 +107,19 @@ build_and_push() {
     
     log "Building ${service} with tag ${tag}..."
     
+    # Verify service directory exists
+    if [[ ! -d "services/${service}" ]]; then
+        error "Service directory 'services/${service}' not found"
+    fi
+    
+    if [[ ! -f "services/${service}/Dockerfile" ]]; then
+        error "Dockerfile not found in 'services/${service}/'"
+    fi
+    
     # Build the image
-    docker build -t "${service}:${tag}" -t "${service}:latest" "services/${service}/"
+    if ! docker build -t "${service}:${tag}" -t "${service}:latest" "services/${service}/"; then
+        error "Failed to build ${service}"
+    fi
     
     # Tag for ECR
     docker tag "${service}:${tag}" "${image_name}:${tag}"
@@ -83,8 +127,13 @@ build_and_push() {
     
     # Push to ECR
     log "Pushing ${service} to ECR..."
-    docker push "${image_name}:${tag}"
-    docker push "${image_name}:latest"
+    if ! docker push "${image_name}:${tag}"; then
+        error "Failed to push ${service}:${tag} to ECR"
+    fi
+    
+    if ! docker push "${image_name}:latest"; then
+        error "Failed to push ${service}:latest to ECR"
+    fi
     
     log "Successfully pushed ${service}:${tag}"
     echo "${tag}"

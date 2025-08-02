@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Gaming Microservices - Amazon Linux Setup Script
-# This script installs Docker, AWS CLI v2, Kubernetes tools, and Python on Amazon Linux
+# This script installs Docker, AWS CLI v2, Kubernetes tools, and Node.js on Amazon Linux
 
 set -e
 
@@ -46,7 +46,7 @@ print_banner() {
     echo -e "  🐳 Docker & Docker Compose"
     echo -e "  ☁️  AWS CLI v2"
     echo -e "  ☸️  Kubernetes (kubectl, kustomize, helm)"
-    echo -e "   Node.js & npm"
+    echo -e "  📦 Node.js & npm"
     echo -e "  🔧 Development tools"
     echo ""
 }
@@ -179,18 +179,37 @@ install_aws_cli() {
 install_nodejs() {
     log "Installing Node.js and npm..."
     
-    # Install using NodeSource repository for latest LTS
-    curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
-    sudo yum install -y nodejs
+    if [[ "$AL_VERSION" == "2023" ]]; then
+        # Amazon Linux 2023 - use NodeSource for latest
+        curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+        sudo yum install -y nodejs
+    else
+        # Amazon Linux 2 - use amazon-linux-extras for compatibility
+        log "Installing Node.js via amazon-linux-extras for Amazon Linux 2..."
+        sudo amazon-linux-extras install -y nodejs14 2>/dev/null || {
+            # Fallback: install from EPEL if amazon-linux-extras fails
+            log "Fallback: Installing Node.js from EPEL..."
+            sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+            sudo yum install -y nodejs npm
+        }
+    fi
     
-    # Install global packages
+    # Install global packages (with error handling)
     log "Installing global npm packages..."
-    sudo npm install -g \
+    npm install -g \
         yarn \
         pm2 \
         nodemon \
         @aws-cdk/cli \
-        serverless
+        serverless 2>/dev/null || {
+        warn "Some global packages may have failed to install"
+        # Try installing individually
+        npm install -g yarn || warn "Failed to install yarn"
+        npm install -g pm2 || warn "Failed to install pm2"
+        npm install -g nodemon || warn "Failed to install nodemon"
+        npm install -g @aws-cdk/cli || warn "Failed to install AWS CDK"
+        npm install -g serverless || warn "Failed to install serverless"
+    }
     
     # Verify installation
     if node --version &>/dev/null; then

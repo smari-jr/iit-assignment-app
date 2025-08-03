@@ -2,6 +2,20 @@
 
 # Comprehensive deployment script for gaming microservices
 # This script builds, pushes to ECR, and deploys to Kubernetes
+#
+# Prerequisites:
+# - AWS CLI configured with appropriate permissions
+# - Docker installed and running
+# - kubectl installed
+# - kustomize installed
+# - Access to EKS cluster specified in EKS_CLUSTER_NAME variable
+#
+# Configuration:
+# - EKS_CLUSTER_NAME: The name of your EKS cluster (currently: iit-test-dev-eks)
+# - REGION: AWS region for ECR and EKS (currently: ap-southeast-1)
+# - ECR_REGISTRY: Your ECR registry URL
+# - NAMESPACE: Kubernetes namespace for deployment
+# - REPO_PREFIX: Prefix for ECR repositories
 
 set -e
 
@@ -10,6 +24,7 @@ REGION="ap-southeast-1"
 ECR_REGISTRY="036160411895.dkr.ecr.ap-southeast-1.amazonaws.com"
 NAMESPACE="gaming-microservices"
 REPO_PREFIX="gaming-microservices"
+EKS_CLUSTER_NAME="iit-test-dev-eks"
 
 # Colors for output
 RED='\033[0;31m'
@@ -188,9 +203,52 @@ update_kustomization() {
         fi
     fi
     
+    # Update dev overlay kustomization.yaml with new image tags
+    if [[ -f "kustomize/overlays/dev/kustomization.yaml" ]]; then
+        log "Updating dev overlay image tags..."
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # Update frontend tag
+            sed -i '' "s#- name: ${ECR_REGISTRY}/.*frontend.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/frontend/,/newTag:/ s/newTag: .*/newTag: ${frontend_tag}/" kustomize/overlays/dev/kustomization.yaml
+            
+            # Update gaming-service tag
+            sed -i '' "s#- name: ${ECR_REGISTRY}/.*gaming-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/gaming-service/,/newTag:/ s/newTag: .*/newTag: ${gaming_tag}/" kustomize/overlays/dev/kustomization.yaml
+            
+            # Update order-service tag
+            sed -i '' "s#- name: ${ECR_REGISTRY}/.*order-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/order-service/,/newTag:/ s/newTag: .*/newTag: ${order_tag}/" kustomize/overlays/dev/kustomization.yaml
+            
+            # Update analytics-service tag
+            sed -i '' "s#- name: ${ECR_REGISTRY}/.*analytics-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/analytics-service/,/newTag:/ s/newTag: .*/newTag: ${analytics_tag}/" kustomize/overlays/dev/kustomization.yaml
+        else
+            # Update frontend tag
+            sed -i "s#- name: ${ECR_REGISTRY}/.*frontend.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/frontend/,/newTag:/ s/newTag: .*/newTag: ${frontend_tag}/" kustomize/overlays/dev/kustomization.yaml
+            
+            # Update gaming-service tag
+            sed -i "s#- name: ${ECR_REGISTRY}/.*gaming-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/gaming-service/,/newTag:/ s/newTag: .*/newTag: ${gaming_tag}/" kustomize/overlays/dev/kustomization.yaml
+            
+            # Update order-service tag
+            sed -i "s#- name: ${ECR_REGISTRY}/.*order-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/order-service/,/newTag:/ s/newTag: .*/newTag: ${order_tag}/" kustomize/overlays/dev/kustomization.yaml
+            
+            # Update analytics-service tag
+            sed -i "s#- name: ${ECR_REGISTRY}/.*analytics-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service#g" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/analytics-service/,/newTag:/ s/newTag: .*/newTag: ${analytics_tag}/" kustomize/overlays/dev/kustomization.yaml
+        fi
+    fi
+    
     # Verify the kustomization is valid
     if ! kustomize build kustomize/base/ > /dev/null 2>&1; then
-        error "Kustomization validation failed after updating image tags"
+        error "Base kustomization validation failed after updating image tags"
+    fi
+    
+    # Verify the dev overlay kustomization is valid
+    if [[ -d "kustomize/overlays/dev" ]] && ! kustomize build kustomize/overlays/dev/ > /dev/null 2>&1; then
+        error "Dev overlay kustomization validation failed after updating image tags"
     fi
     
     log "Image tags updated successfully in all YAML files!"
@@ -257,6 +315,26 @@ cleanup_images() {
     log "Image cleanup completed!"
 }
 
+# Configure kubectl for EKS cluster
+configure_eks_access() {
+    log "Configuring kubectl for EKS cluster: ${EKS_CLUSTER_NAME}..."
+    
+    # Update kubeconfig for EKS cluster
+    if ! aws eks update-kubeconfig --region ${REGION} --name ${EKS_CLUSTER_NAME}; then
+        error "Failed to configure kubectl for EKS cluster '${EKS_CLUSTER_NAME}'. Please check cluster name and AWS credentials."
+    fi
+    
+    # Verify connection to cluster
+    log "Verifying connection to EKS cluster..."
+    if ! kubectl cluster-info &> /dev/null; then
+        error "Unable to connect to EKS cluster. Please verify cluster access and AWS credentials."
+    fi
+    
+    # Show current context
+    local current_context=$(kubectl config current-context)
+    log "Successfully connected to EKS cluster. Current context: ${current_context}"
+}
+
 # Main deployment flow
 main() {
     log "Starting gaming microservices deployment..."
@@ -266,6 +344,9 @@ main() {
     # Login to ECR
     log "Logging in to ECR..."
     aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+    
+    # Configure EKS access
+    configure_eks_access
     
     # Build and push all services
     log "Building and pushing all services..."

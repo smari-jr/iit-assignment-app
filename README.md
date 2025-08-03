@@ -35,6 +35,7 @@ A modern cloud-native gaming platform built with microservices architecture, fea
 - **kubectl** - Kubernetes CLI tool
 - **kustomize** - Kubernetes configuration management
 - **AWS CLI** - For EKS deployment (configured with credentials)
+- **EKS Cluster Access** - Access to EKS cluster `iit-test-dev-eks` (or modify cluster name in script)
 - **Node.js 18+** - For local development (optional)
 
 ### 1. Production Deployment (Recommended)
@@ -43,6 +44,10 @@ A modern cloud-native gaming platform built with microservices architecture, fea
 # Clone the repository
 git clone https://github.com/smari-jr/iit-assignment-app.git
 cd microservices
+
+# Configure EKS cluster access (if different from default)
+# Edit scripts/deploy-optimized.sh and change EKS_CLUSTER_NAME variable
+# Current default: EKS_CLUSTER_NAME="iit-test-dev-eks"
 
 # Deploy to Kubernetes (builds, pushes to ECR, and deploys)
 ./scripts/deploy-optimized.sh

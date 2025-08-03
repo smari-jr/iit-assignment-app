@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend:v20250803-161325-8b0ebe0
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend:v20250803-171506-fa20cda
         ports:
         - containerPort: 80
         env:

@@ -14,14 +14,14 @@ commonLabels:
   app.kubernetes.io/instance: dev
 
 images:
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/frontend
-  newTag: dev
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/gaming-service
-  newTag: dev
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/order-service
-  newTag: dev
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/lugx-gaming/analytics-service
-  newTag: dev
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend
+  newTag: v20250803-171506-fa20cda
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service
+  newTag: v20250803-171520-fa20cda
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service
+  newTag: v20250803-171528-fa20cda
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service
+  newTag: v20250803-171534-fa20cda
 
 replicas:
 - name: frontend

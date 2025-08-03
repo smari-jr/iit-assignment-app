@@ -285,48 +285,7 @@ cleanup_images() {
     log "✅ Image cleanup completed!"
 }
 
-# Create dev overlay kustomization.yaml if missing
-create_dev_overlay_kustomization() {
-    log "Creating dev overlay kustomization.yaml..."
-    cat > kustomize/overlays/dev/kustomization.yaml << 'EOF'
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
 
-namespace: lugx-gaming
-
-resources:
-- ../../base
-
-patchesStrategicMerge:
-- config-patch.yaml
-
-labels:
-- pairs:
-    environment: development
-    app.kubernetes.io/instance: dev
-
-images:
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend
-  newTag: latest
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service
-  newTag: latest
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service
-  newTag: latest
-- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service
-  newTag: latest
-
-replicas:
-- name: frontend
-  count: 1
-- name: gaming-service
-  count: 1
-- name: order-service
-  count: 1
-- name: analytics-service
-  count: 1
-EOF
-    log "Dev overlay kustomization.yaml created successfully!"
-}
 
 # Update dev overlay kustomization with new image tags
 update_kustomization() {
@@ -335,65 +294,46 @@ update_kustomization() {
     local order_tag=$3
     local analytics_tag=$4
     
-    log "📝 Updating image tags in dev overlay..."
+    log "📝 Updating image tags in existing kustomization..."
     
     # Create a backup of the original file
     cp kustomize/overlays/dev/kustomization.yaml kustomize/overlays/dev/kustomization.yaml.backup
     
-    # Create a new kustomization.yaml with updated tags
-    cat > kustomize/overlays/dev/kustomization.yaml << EOF
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-namespace: ${NAMESPACE}
-
-resources:
-- ../../base
-
-patches:
-- path: config-patch.yaml
-
-labels:
-- pairs:
-    environment: development
-    app.kubernetes.io/instance: dev
-
-images:
-- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend
-  newTag: ${frontend_tag}
-- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service
-  newTag: ${gaming_tag}
-- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service
-  newTag: ${order_tag}
-- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service
-  newTag: ${analytics_tag}
-
-replicas:
-- name: frontend
-  count: 1
-- name: gaming-service
-  count: 1
-- name: order-service
-  count: 1
-- name: analytics-service
-  count: 1
-EOF
+    # Update image tags in the existing kustomization.yaml using sed
+    sed -i.tmp "s|newTag: v[0-9]*-.*|newTag: ${frontend_tag}|" kustomize/overlays/dev/kustomization.yaml
+    
+    # Update each service tag individually
+    sed -i.tmp "/frontend$/,/newTag:/ s/newTag: .*/newTag: ${frontend_tag}/" kustomize/overlays/dev/kustomization.yaml
+    sed -i.tmp "/gaming-service$/,/newTag:/ s/newTag: .*/newTag: ${gaming_tag}/" kustomize/overlays/dev/kustomization.yaml
+    sed -i.tmp "/order-service$/,/newTag:/ s/newTag: .*/newTag: ${order_tag}/" kustomize/overlays/dev/kustomization.yaml
+    sed -i.tmp "/analytics-service$/,/newTag:/ s/newTag: .*/newTag: ${analytics_tag}/" kustomize/overlays/dev/kustomization.yaml
+    
+    # Remove temporary file
+    rm -f kustomize/overlays/dev/kustomization.yaml.tmp
     
     # Test kustomize build
-    if kustomize build kustomize/overlays/dev/ > /dev/null; then
+    if kustomize build kustomize/overlays/dev/ > /dev/null 2>&1; then
         rm -f kustomize/overlays/dev/kustomization.yaml.backup
         log "✅ Image tags updated successfully!"
+        log "Updated tags: frontend:${frontend_tag}, gaming:${gaming_tag}, order:${order_tag}, analytics:${analytics_tag}"
     else
+        log "Kustomization build failed, showing error:"
+        kustomize build kustomize/overlays/dev/ 2>&1 || true
         mv kustomize/overlays/dev/kustomization.yaml.backup kustomize/overlays/dev/kustomization.yaml
         error "Kustomization validation failed. Backup restored."
     fi
 }
 
-# Deploy to Kubernetes using dev overlay
+# Deploy to Kubernetes using existing dev overlay
 deploy_to_k8s() {
-    log "🚀 Deploying to Kubernetes..."
+    log "🚀 Deploying to Kubernetes using existing kustomize templates..."
     
-    # Apply kustomization
+    # Verify kustomization exists
+    if [ ! -f "kustomize/overlays/dev/kustomization.yaml" ]; then
+        error "Kustomization file not found at kustomize/overlays/dev/kustomization.yaml"
+    fi
+    
+    # Apply kustomization using kubectl
     kubectl apply -k kustomize/overlays/dev/
     
     # Wait for rollout

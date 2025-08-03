@@ -50,7 +50,7 @@ error() {
     echo -e "${RED}  - services/gaming-service/${NC}"
     echo -e "${RED}  - services/order-service/${NC}"
     echo -e "${RED}  - services/analytics-service/${NC}"
-    echo -e "${RED}  - kustomize/base/${NC}"
+    echo -e "${RED}  - kustomize/overlays/dev/${NC}"
     exit 1
 }
 
@@ -106,6 +106,36 @@ check_prerequisites() {
     fi
     
     log "✅ Prerequisites check passed!"
+}
+
+# Debug function to check current state
+debug_kustomization() {
+    log "🔍 Debugging kustomization structure..."
+    
+    log "Current directory: $(pwd)"
+    log "Directory structure:"
+    find . -name "*.yaml" -type f | grep -E "(kustomize|services)" | sort
+    
+    log "Dev overlay kustomization.yaml content:"
+    if [[ -f "kustomize/overlays/dev/kustomization.yaml" ]]; then
+        cat kustomize/overlays/dev/kustomization.yaml
+    else
+        log "❌ Dev overlay kustomization.yaml not found"
+    fi
+    
+    log "Base kustomization.yaml content:"
+    if [[ -f "kustomize/base/kustomization.yaml" ]]; then
+        cat kustomize/base/kustomization.yaml
+    else
+        log "❌ Base kustomization.yaml not found"
+    fi
+    
+    log "Testing kustomize build..."
+    if kustomize build kustomize/overlays/dev/ 2>&1; then
+        log "✅ Kustomize build successful"
+    else
+        log "❌ Kustomize build failed"
+    fi
 }
 
 # Generate image tag
@@ -249,46 +279,69 @@ update_kustomization() {
     
     # Update dev overlay kustomization.yaml with new image tags
     log "Updating dev overlay image tags..."
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # Update frontend tag
-        sed -i '' "s#- name: ${ECR_REGISTRY}/.*frontend.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/frontend/,/newTag:/ s/newTag: .*/newTag: ${frontend_tag}/" kustomize/overlays/dev/kustomization.yaml
-        
-        # Update gaming-service tag
-        sed -i '' "s#- name: ${ECR_REGISTRY}/.*gaming-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/gaming-service/,/newTag:/ s/newTag: .*/newTag: ${gaming_tag}/" kustomize/overlays/dev/kustomization.yaml
-        
-        # Update order-service tag
-        sed -i '' "s#- name: ${ECR_REGISTRY}/.*order-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/order-service/,/newTag:/ s/newTag: .*/newTag: ${order_tag}/" kustomize/overlays/dev/kustomization.yaml
-        
-        # Update analytics-service tag
-        sed -i '' "s#- name: ${ECR_REGISTRY}/.*analytics-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i '' "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/analytics-service/,/newTag:/ s/newTag: .*/newTag: ${analytics_tag}/" kustomize/overlays/dev/kustomization.yaml
+    
+    # Create a backup of the original file
+    cp kustomize/overlays/dev/kustomization.yaml kustomize/overlays/dev/kustomization.yaml.backup
+    
+    # Use a more reliable approach with Python or Perl if available, otherwise use sed
+    if command -v python3 &> /dev/null; then
+        # Use Python for more reliable text replacement
+        python3 -c "
+import re
+import sys
+
+# Read the file
+with open('kustomize/overlays/dev/kustomization.yaml', 'r') as f:
+    content = f.read()
+
+# Update image tags
+content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend\s*\n\s*newTag:) .*', r'\1 ${frontend_tag}', content)
+content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service\s*\n\s*newTag:) .*', r'\1 ${gaming_tag}', content)
+content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service\s*\n\s*newTag:) .*', r'\1 ${order_tag}', content)
+content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service\s*\n\s*newTag:) .*', r'\1 ${analytics_tag}', content)
+
+# Write back
+with open('kustomize/overlays/dev/kustomization.yaml', 'w') as f:
+    f.write(content)
+"
     else
-        # Update frontend tag
-        sed -i "s#- name: ${ECR_REGISTRY}/.*frontend.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/frontend/,/newTag:/ s/newTag: .*/newTag: ${frontend_tag}/" kustomize/overlays/dev/kustomization.yaml
+        # Fallback to sed with proper escaping
+        local ecr_escaped=$(echo "${ECR_REGISTRY}" | sed 's/[[\.*^$()+?{|]/\\&/g')
+        local repo_escaped=$(echo "${REPO_PREFIX}" | sed 's/[[\.*^$()+?{|]/\\&/g')
         
-        # Update gaming-service tag
-        sed -i "s#- name: ${ECR_REGISTRY}/.*gaming-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/gaming-service/,/newTag:/ s/newTag: .*/newTag: ${gaming_tag}/" kustomize/overlays/dev/kustomization.yaml
-        
-        # Update order-service tag
-        sed -i "s#- name: ${ECR_REGISTRY}/.*order-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/order-service/,/newTag:/ s/newTag: .*/newTag: ${order_tag}/" kustomize/overlays/dev/kustomization.yaml
-        
-        # Update analytics-service tag
-        sed -i "s#- name: ${ECR_REGISTRY}/.*analytics-service.*#- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service#g" kustomize/overlays/dev/kustomization.yaml
-        sed -i "/- name: ${ECR_REGISTRY}\/${REPO_PREFIX}\/analytics-service/,/newTag:/ s/newTag: .*/newTag: ${analytics_tag}/" kustomize/overlays/dev/kustomization.yaml
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS sed
+            sed -i '' "s|newTag: .*|newTag: ${frontend_tag}|" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "s|newTag: .*|newTag: ${gaming_tag}|" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "s|newTag: .*|newTag: ${order_tag}|" kustomize/overlays/dev/kustomization.yaml
+            sed -i '' "s|newTag: .*|newTag: ${analytics_tag}|" kustomize/overlays/dev/kustomization.yaml
+        else
+            # Linux sed - Update each service individually
+            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/frontend/{n;s/newTag: .*/newTag: ${frontend_tag}/;}" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/gaming-service/{n;s/newTag: .*/newTag: ${gaming_tag}/;}" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/order-service/{n;s/newTag: .*/newTag: ${order_tag}/;}" kustomize/overlays/dev/kustomization.yaml
+            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/analytics-service/{n;s/newTag: .*/newTag: ${analytics_tag}/;}" kustomize/overlays/dev/kustomization.yaml
+        fi
     fi
+    
+    # Verify the changes were made
+    log "Verifying updated image tags:"
+    grep -A 1 "- name: ${ECR_REGISTRY}/${REPO_PREFIX}" kustomize/overlays/dev/kustomization.yaml || true
     
     # Verify the dev overlay kustomization is valid
-    if ! kustomize build kustomize/overlays/dev/ > /dev/null 2>&1; then
-        error "Dev overlay kustomization validation failed after updating image tags"
+    log "Validating updated kustomization..."
+    if ! kustomize build kustomize/overlays/dev/ > /tmp/kustomize_output.yaml 2> /tmp/kustomize_error.log; then
+        log "❌ Kustomization validation failed. Error output:"
+        cat /tmp/kustomize_error.log
+        log "Restoring backup..."
+        mv kustomize/overlays/dev/kustomization.yaml.backup kustomize/overlays/dev/kustomization.yaml
+        error "Dev overlay kustomization validation failed after updating image tags. Backup restored."
     fi
     
-    log "Image tags updated successfully in dev overlay!"
+    # Remove backup if successful
+    rm -f kustomize/overlays/dev/kustomization.yaml.backup
+    
+    log "✅ Image tags updated successfully in dev overlay!"
     log "Updated tags: frontend=${frontend_tag}, gaming=${gaming_tag}, order=${order_tag}, analytics=${analytics_tag}"
 }
 
@@ -306,7 +359,11 @@ deploy_to_k8s() {
     
     # Validate kustomization before applying
     log "Validating kustomization at ${kustomize_path}..."
-    if ! kustomize build "${kustomize_path}/" > /dev/null; then
+    if ! kustomize build "${kustomize_path}/" > /tmp/kustomize_validation.yaml 2> /tmp/kustomize_validation_error.log; then
+        log "❌ Kustomization validation failed. Error details:"
+        cat /tmp/kustomize_validation_error.log
+        log "Debug info:"
+        debug_kustomization
         error "Kustomization validation failed. Please check ${kustomize_path}/kustomization.yaml"
     fi
     
@@ -452,6 +509,7 @@ case "${1:-deploy}" in
         ;;
     "deploy-only")
         check_prerequisites
+        configure_eks_access
         deploy_to_k8s
         verify_deployment
         ;;
@@ -460,6 +518,9 @@ case "${1:-deploy}" in
         ;;
     "cleanup")
         cleanup_images
+        ;;
+    "debug")
+        debug_kustomization
         ;;
     "deploy"|*)
         main

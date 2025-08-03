@@ -6,12 +6,13 @@ namespace: lugx-gaming
 resources:
 - ../../base
 
-patchesStrategicMerge:
-- config-patch.yaml
+patches:
+- path: config-patch.yaml
 
-commonLabels:
-  environment: development
-  app.kubernetes.io/instance: dev
+labels:
+- pairs:
+    environment: development
+    app.kubernetes.io/instance: dev
 
 images:
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend

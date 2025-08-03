@@ -14,8 +14,9 @@ resources:
   - network-policy.yaml
   - health-check.yaml
 
-commonLabels:
-  app: gaming-microservices
-  version: v1.0.0
+labels:
+- pairs:
+    app: gaming-microservices
+    version: v1.0.0
 
 namespace: gaming-microservices

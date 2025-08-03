@@ -1,5 +1,7 @@
 # Gaming Microservices - Production Ready
 
+# Gaming Microservices - Production Ready
+
 ## 🎯 Overview
 
 A fully optimized gaming microservices platform ready for Kubernetes deployment with proper service separation, health checks, monitoring, and scalability.
@@ -34,7 +36,7 @@ Each service includes `.env.example` files with all configuration options:
 
 - **Frontend**: Environment-based API configuration
 - **Gaming Service**: JWT secrets, DB config, rate limiting
-- **Order Service**: Stripe integration, service communication
+- **Order Service**: Service communication, database config
 - **Analytics Service**: ClickHouse, data retention settings
 
 ## 📦 Services
@@ -43,10 +45,63 @@ Each service includes `.env.example` files with all configuration options:
 |---------|------|---------|------------|
 | Frontend | 80 | React UI + Nginx proxy | React 18.2.0, Nginx |
 | Gaming | 3001 | Auth, users, products | Node.js, Express, Sequelize |
-| Orders | 3002 | Order processing, payments | Node.js, Express, Stripe |
+| Orders | 3002 | Order processing, payments | Node.js, Express |
 | Analytics | 3003 | Event tracking, metrics | Node.js, ClickHouse |
 
 ## 🎯 Production Features
+
+- **Kubernetes Ready**: Complete Kustomize configuration
+- **Health Checks**: All services include health endpoints
+- **Monitoring**: Comprehensive logging and metrics
+- **Security**: Non-root containers, secrets management
+- **Scalability**: Horizontal pod autoscaling ready
+- **CI/CD**: Automated build and deployment pipeline
+
+## 🚀 Deployment
+
+### Prerequisites
+- Kubernetes cluster (EKS recommended)
+- kubectl configured  
+- Docker registry access (ECR)
+- AWS CLI configured
+
+### Production Deployment
+```bash
+# Configure AWS credentials
+aws configure
+
+# Update kubeconfig for EKS
+aws eks update-kubeconfig --region ap-southeast-1 --name your-cluster-name
+
+# Deploy to production
+./scripts/deploy-optimized.sh
+```
+
+### Local Development
+```bash
+# Start with Docker Compose
+docker-compose up -d
+
+# Access services
+curl http://localhost:3001/health    # Gaming Service
+curl http://localhost:3002/health    # Order Service  
+curl http://localhost:3003/health    # Analytics Service
+```
+
+## 📊 Monitoring
+
+### Health Checks
+All services expose `/health` endpoints for Kubernetes readiness/liveness probes.
+
+### Logging
+Structured JSON logging with correlation IDs for request tracing.
+
+### Metrics  
+Application metrics exposed for Prometheus scraping.
+
+---
+
+**Ready for production deployment! 🚀**
 
 ### ✅ Optimizations Complete
 

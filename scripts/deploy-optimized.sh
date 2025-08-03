@@ -105,7 +105,7 @@ build_and_push() {
     local tag=$(generate_image_tag)
     local image_name="${ECR_REGISTRY}/${REPO_PREFIX}/${service}"
     
-    log "Building ${service} with tag ${tag}..."
+    log "Building ${service} with tag ${tag}..." >&2
     
     # Verify service directory exists
     if [[ ! -d "services/${service}" ]]; then
@@ -117,25 +117,25 @@ build_and_push() {
     fi
     
     # Build the image
-    if ! docker build -t "${service}:${tag}" -t "${service}:latest" "services/${service}/"; then
+    if ! docker build -t "${service}:${tag}" -t "${service}:latest" "services/${service}/" >&2; then
         error "Failed to build ${service}"
     fi
     
     # Tag for ECR
-    docker tag "${service}:${tag}" "${image_name}:${tag}"
-    docker tag "${service}:latest" "${image_name}:latest"
+    docker tag "${service}:${tag}" "${image_name}:${tag}" >&2
+    docker tag "${service}:latest" "${image_name}:latest" >&2
     
     # Push to ECR
-    log "Pushing ${service} to ECR..."
-    if ! docker push "${image_name}:${tag}"; then
+    log "Pushing ${service} to ECR..." >&2
+    if ! docker push "${image_name}:${tag}" >&2; then
         error "Failed to push ${service}:${tag} to ECR"
     fi
     
-    if ! docker push "${image_name}:latest"; then
+    if ! docker push "${image_name}:latest" >&2; then
         error "Failed to push ${service}:latest to ECR"
     fi
     
-    log "Successfully pushed ${service}:${tag}"
+    log "Successfully pushed ${service}:${tag}" >&2
     echo "${tag}"
 }
 
@@ -152,9 +152,9 @@ update_kustomization() {
     if [[ -f "kustomize/base/frontend.yaml" ]]; then
         log "Updating frontend image to: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|image: .*frontend.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}|g" kustomize/base/frontend.yaml
+            sed -i '' "s#image: .*frontend.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}#g" kustomize/base/frontend.yaml
         else
-            sed -i "s|image: .*frontend.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}|g" kustomize/base/frontend.yaml
+            sed -i "s#image: .*frontend.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}#g" kustomize/base/frontend.yaml
         fi
     fi
     
@@ -162,9 +162,9 @@ update_kustomization() {
     if [[ -f "kustomize/base/gaming-service.yaml" ]]; then
         log "Updating gaming-service image to: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|image: .*gaming-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}|g" kustomize/base/gaming-service.yaml
+            sed -i '' "s#image: .*gaming-service.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}#g" kustomize/base/gaming-service.yaml
         else
-            sed -i "s|image: .*gaming-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}|g" kustomize/base/gaming-service.yaml
+            sed -i "s#image: .*gaming-service.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}#g" kustomize/base/gaming-service.yaml
         fi
     fi
     
@@ -172,9 +172,9 @@ update_kustomization() {
     if [[ -f "kustomize/base/order-service.yaml" ]]; then
         log "Updating order-service image to: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|image: .*order-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}|g" kustomize/base/order-service.yaml
+            sed -i '' "s#image: .*order-service.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}#g" kustomize/base/order-service.yaml
         else
-            sed -i "s|image: .*order-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}|g" kustomize/base/order-service.yaml
+            sed -i "s#image: .*order-service.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}#g" kustomize/base/order-service.yaml
         fi
     fi
     
@@ -182,9 +182,9 @@ update_kustomization() {
     if [[ -f "kustomize/base/analytics-service.yaml" ]]; then
         log "Updating analytics-service image to: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}"
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|image: .*analytics-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}|g" kustomize/base/analytics-service.yaml
+            sed -i '' "s#image: .*analytics-service.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}#g" kustomize/base/analytics-service.yaml
         else
-            sed -i "s|image: .*analytics-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}|g" kustomize/base/analytics-service.yaml
+            sed -i "s#image: .*analytics-service.*#image: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}#g" kustomize/base/analytics-service.yaml
         fi
     fi
     

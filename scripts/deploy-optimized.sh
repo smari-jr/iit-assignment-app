@@ -146,45 +146,74 @@ update_kustomization() {
     local order_tag=$3
     local analytics_tag=$4
     
-    log "Updating kustomization.yaml with new image tags..."
+    log "Updating image tags in individual YAML files..."
     
-    # Create a backup
-    cp kustomize/base/kustomization.yaml kustomize/base/kustomization.yaml.backup
+    # Update frontend image
+    if [[ -f "kustomize/base/frontend.yaml" ]]; then
+        log "Updating frontend image to: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|image: .*frontend.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}|g" kustomize/base/frontend.yaml
+        else
+            sed -i "s|image: .*frontend.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend:${frontend_tag}|g" kustomize/base/frontend.yaml
+        fi
+    fi
     
-    # Use awk for more precise replacement
-    awk -v ftag="$frontend_tag" -v gtag="$gaming_tag" -v otag="$order_tag" -v atag="$analytics_tag" '
-    BEGIN { in_images = 0; current_image = "" }
-    /^images:/ { in_images = 1; print; next }
-    in_images && /^- name: / { 
-        if ($3 == "gaming-frontend") current_image = "frontend"
-        else if ($3 == "gaming-service") current_image = "gaming"
-        else if ($3 == "order-service") current_image = "order"
-        else if ($3 == "analytics-service") current_image = "analytics"
-        else current_image = ""
-        print; next
-    }
-    in_images && /^  newTag: / {
-        if (current_image == "frontend") print "  newTag: " ftag
-        else if (current_image == "gaming") print "  newTag: " gtag
-        else if (current_image == "order") print "  newTag: " otag
-        else if (current_image == "analytics") print "  newTag: " atag
-        else print
-        next
-    }
-    /^[^ ]/ && in_images && !/^- name:/ && !/^  / { in_images = 0 }
-    { print }
-    ' kustomize/base/kustomization.yaml.backup > kustomize/base/kustomization.yaml
+    # Update gaming-service image
+    if [[ -f "kustomize/base/gaming-service.yaml" ]]; then
+        log "Updating gaming-service image to: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|image: .*gaming-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}|g" kustomize/base/gaming-service.yaml
+        else
+            sed -i "s|image: .*gaming-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service:${gaming_tag}|g" kustomize/base/gaming-service.yaml
+        fi
+    fi
     
-    # Remove backup
-    rm kustomize/base/kustomization.yaml.backup
+    # Update order-service image
+    if [[ -f "kustomize/base/order-service.yaml" ]]; then
+        log "Updating order-service image to: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|image: .*order-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}|g" kustomize/base/order-service.yaml
+        else
+            sed -i "s|image: .*order-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service:${order_tag}|g" kustomize/base/order-service.yaml
+        fi
+    fi
     
-    log "Kustomization updated successfully!"
+    # Update analytics-service image
+    if [[ -f "kustomize/base/analytics-service.yaml" ]]; then
+        log "Updating analytics-service image to: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' "s|image: .*analytics-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}|g" kustomize/base/analytics-service.yaml
+        else
+            sed -i "s|image: .*analytics-service.*|image: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service:${analytics_tag}|g" kustomize/base/analytics-service.yaml
+        fi
+    fi
+    
+    # Verify the kustomization is valid
+    if ! kustomize build kustomize/base/ > /dev/null 2>&1; then
+        error "Kustomization validation failed after updating image tags"
+    fi
+    
+    log "Image tags updated successfully in all YAML files!"
     log "Updated tags: frontend=${frontend_tag}, gaming=${gaming_tag}, order=${order_tag}, analytics=${analytics_tag}"
 }
 
 # Deploy to Kubernetes
 deploy_to_k8s() {
     log "Deploying to Kubernetes..."
+    
+    # Clean the kustomization file of any control characters
+    if command -v dos2unix &> /dev/null; then
+        dos2unix kustomize/base/kustomization.yaml 2>/dev/null || true
+    fi
+    
+    # Remove any control characters manually
+    sed -i 's/[[:cntrl:]]//g' kustomize/base/kustomization.yaml 2>/dev/null || true
+    
+    # Validate kustomization before applying
+    log "Validating kustomization..."
+    if ! kustomize build kustomize/base/ > /dev/null; then
+        error "Kustomization validation failed. Please check kustomize/base/kustomization.yaml"
+    fi
     
     # Apply kustomization
     kubectl apply -k kustomize/base/

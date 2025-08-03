@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: analytics-service
-        image: analytics-service:latest
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service:latest
         ports:
         - containerPort: 3003
         env:

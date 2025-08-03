@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: gaming-service
-        image: gaming-service:latest
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service:latest
         ports:
         - containerPort: 3001
         env:

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: order-service
-        image: order-service:latest
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service:latest
         ports:
         - containerPort: 3002
         env:

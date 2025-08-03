@@ -22,6 +22,9 @@ const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  ssl: process.env.NODE_ENV === 'production' || (process.env.DB_HOST && (process.env.DB_HOST.includes('rds.amazonaws.com') || process.env.DB_HOST.includes('amazonaws.com'))) ? {
+    rejectUnauthorized: false
+  } : false
 });
 
 // ClickHouse client for analytics data collection

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: analytics-service
-        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service:v20250803-171534-fa20cda
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service:ssl-fix-20250803-233339
         imagePullPolicy: Always
         ports:
         - containerPort: 3003

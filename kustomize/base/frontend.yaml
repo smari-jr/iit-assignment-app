@@ -14,10 +14,10 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend:v20250803-171506-fa20cda
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend:port-fix-amd64-20250803-235857
         imagePullPolicy: Always
         ports:
-        - containerPort: 80
+        - containerPort: 8080
         env:
         - name: REACT_APP_GAMING_SERVICE_URL
           valueFrom:
@@ -51,5 +51,5 @@ spec:
     app: frontend
   ports:
   - port: 80
-    targetPort: 80
+    targetPort: 8080
   type: ClusterIP

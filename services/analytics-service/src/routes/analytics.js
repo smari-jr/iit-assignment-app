@@ -789,4 +789,681 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
+// ==== DATA SEEDING ENDPOINT FOR DEMO ====
+
+// Seed sample analytics data for demonstration
+router.post('/seed-sample-data', async (req, res) => {
+  try {
+    const db = req.app.get('db');
+    const clickhouse = req.app.get('clickhouse');
+    
+    // Sample data for the last 30 days
+    const sampleData = [];
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
+    // Generate sample page visits
+    for (let i = 0; i < 1000; i++) {
+      const randomDate = new Date(startDate.getTime() + Math.random() * (Date.now() - startDate.getTime()));
+      const sessionId = `session_${Math.floor(Math.random() * 200)}`;
+      const userId = Math.random() > 0.3 ? `user_${Math.floor(Math.random() * 100)}` : null;
+      
+      const pages = ['/', '/products', '/products/gaming-chair', '/products/gaming-mouse', '/cart', '/checkout', '/profile'];
+      const devices = ['desktop', 'mobile', 'tablet'];
+      const browsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
+      const countries = ['Singapore', 'Malaysia', 'Thailand', 'Indonesia', 'Philippines'];
+      
+      const pageVisit = {
+        id: require('uuid').v4(),
+        session_id: sessionId,
+        user_id: userId,
+        timestamp: randomDate.toISOString(),
+        url: `https://lugx-gaming.com${pages[Math.floor(Math.random() * pages.length)]}`,
+        path: pages[Math.floor(Math.random() * pages.length)],
+        referrer: Math.random() > 0.5 ? 'https://google.com' : null,
+        user_agent: `Mozilla/5.0 (compatible; ${browsers[Math.floor(Math.random() * browsers.length)]})`,
+        ip_address: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+        country: countries[Math.floor(Math.random() * countries.length)],
+        city: 'Singapore',
+        device_type: devices[Math.floor(Math.random() * devices.length)],
+        browser: browsers[Math.floor(Math.random() * browsers.length)],
+        os: 'Windows',
+        screen_resolution: '1920x1080',
+        duration_seconds: Math.floor(Math.random() * 300) + 10,
+        created_at: randomDate.toISOString()
+      };
+      
+      sampleData.push(pageVisit);
+    }
+    
+    // Insert into ClickHouse
+    await clickhouse.insert({
+      table: 'analytics.page_visits',
+      values: sampleData,
+      format: 'JSONEachRow'
+    });
+    
+    // Generate sample events (clicks, scrolls, etc.)
+    const sampleEvents = [];
+    for (let i = 0; i < 500; i++) {
+      const randomDate = new Date(startDate.getTime() + Math.random() * (Date.now() - startDate.getTime()));
+      const sessionId = `session_${Math.floor(Math.random() * 200)}`;
+      
+      const eventTypes = ['click', 'scroll', 'gaming', 'purchase'];
+      const clickEvents = ['button_click', 'link_click', 'add_to_cart', 'checkout_button'];
+      const scrollEvents = ['scroll_25', 'scroll_50', 'scroll_75', 'scroll_100'];
+      const gamingEvents = ['game_start', 'game_end', 'level_complete', 'high_score'];
+      
+      const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+      let eventName = '';
+      let properties = {};
+      
+      switch(eventType) {
+        case 'click':
+          eventName = clickEvents[Math.floor(Math.random() * clickEvents.length)];
+          properties = {
+            element_id: `btn_${Math.floor(Math.random() * 10)}`,
+            page_url: '/products'
+          };
+          break;
+        case 'scroll':
+          eventName = scrollEvents[Math.floor(Math.random() * scrollEvents.length)];
+          properties = {
+            scroll_depth: eventName.split('_')[1],
+            page_height: 2000
+          };
+          break;
+        case 'gaming':
+          eventName = gamingEvents[Math.floor(Math.random() * gamingEvents.length)];
+          properties = {
+            game_id: `game_${Math.floor(Math.random() * 5)}`,
+            score: Math.floor(Math.random() * 50000),
+            level: Math.floor(Math.random() * 10) + 1
+          };
+          break;
+        case 'purchase':
+          eventName = 'purchase_complete';
+          properties = {
+            order_id: `order_${Math.floor(Math.random() * 1000)}`,
+            amount: (Math.random() * 500 + 50).toFixed(2),
+            currency: 'USD'
+          };
+          break;
+      }
+      
+      const event = {
+        id: require('uuid').v4(),
+        session_id: sessionId,
+        user_id: Math.random() > 0.3 ? `user_${Math.floor(Math.random() * 100)}` : null,
+        timestamp: randomDate.toISOString(),
+        event_type: eventType,
+        event_name: eventName,
+        properties: JSON.stringify(properties),
+        url: 'https://lugx-gaming.com/products',
+        user_agent: 'Mozilla/5.0 (compatible; Chrome)',
+        ip_address: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+        country: 'Singapore',
+        city: 'Singapore',
+        created_at: randomDate.toISOString()
+      };
+      
+      sampleEvents.push(event);
+    }
+    
+    // Insert events into ClickHouse
+    await clickhouse.insert({
+      table: 'analytics.events',
+      values: sampleEvents,
+      format: 'JSONEachRow'
+    });
+    
+    res.json({
+      message: 'Sample analytics data seeded successfully',
+      page_visits_created: sampleData.length,
+      events_created: sampleEvents.length,
+      data_range: {
+        start: startDate.toISOString(),
+        end: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error seeding sample data:', error);
+    res.status(500).json({
+      error: 'Failed to seed sample data',
+      message: error.message
+    });
+  }
+});
+
+// ==== QUICKSIGHT-READY ANALYTICS ENDPOINTS ====
+
+// Get real-time metrics for QuickSight dashboard
+router.get('/quicksight/metrics', async (req, res) => {
+  try {
+    const { 
+      start_date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // Last 7 days
+      end_date = new Date().toISOString()
+    } = req.query;
+
+    const clickhouse = req.app.get('clickhouse');
+    
+    // Core metrics query optimized for QuickSight from ClickHouse
+    const metricsQuery = `
+      WITH daily_stats AS (
+        SELECT 
+          toDate(timestamp) as date,
+          count(*) as page_views,
+          uniq(session_id) as unique_sessions,
+          uniq(user_id) as unique_users,
+          avg(duration_seconds) as avg_session_duration,
+          uniq(ip_address) as unique_visitors
+        FROM analytics.page_visits 
+        WHERE timestamp >= toDateTime('${start_date}') AND timestamp <= toDateTime('${end_date}')
+        GROUP BY toDate(timestamp)
+      ),
+      device_stats AS (
+        SELECT 
+          toDate(timestamp) as date,
+          device_type,
+          browser,
+          os,
+          count(*) as visits
+        FROM analytics.page_visits 
+        WHERE timestamp >= toDateTime('${start_date}') AND timestamp <= toDateTime('${end_date}')
+        GROUP BY toDate(timestamp), device_type, browser, os
+      ),
+      geo_stats AS (
+        SELECT 
+          toDate(timestamp) as date,
+          country,
+          city,
+          count(*) as visits
+        FROM analytics.page_visits 
+        WHERE timestamp >= toDateTime('${start_date}') AND timestamp <= toDateTime('${end_date}') AND country != ''
+        GROUP BY toDate(timestamp), country, city
+      ),
+      page_stats AS (
+        SELECT 
+          toDate(timestamp) as date,
+          path as page_path,
+          count(*) as page_views,
+          avg(duration_seconds) as avg_time_on_page
+        FROM analytics.page_visits 
+        WHERE timestamp >= toDateTime('${start_date}') AND timestamp <= toDateTime('${end_date}')
+        GROUP BY toDate(timestamp), path
+      ),
+      event_stats AS (
+        SELECT 
+          toDate(timestamp) as date,
+          event_type,
+          event_name,
+          count(*) as event_count
+        FROM analytics.events 
+        WHERE timestamp >= toDateTime('${start_date}') AND timestamp <= toDateTime('${end_date}')
+        GROUP BY toDate(timestamp), event_type, event_name
+      )
+      SELECT 
+        d.date,
+        d.page_views,
+        d.unique_sessions,
+        d.unique_users,
+        round(d.avg_session_duration, 2) as avg_session_duration,
+        d.unique_visitors,
+        ds.device_type,
+        ds.browser,
+        ds.os,
+        ds.visits as device_visits,
+        gs.country,
+        gs.city,
+        gs.visits as geo_visits,
+        ps.page_path,
+        ps.page_views as page_page_views,
+        round(ps.avg_time_on_page, 2) as avg_time_on_page,
+        es.event_type,
+        es.event_name,
+        es.event_count
+      FROM daily_stats d
+      LEFT JOIN device_stats ds ON d.date = ds.date
+      LEFT JOIN geo_stats gs ON d.date = gs.date  
+      LEFT JOIN page_stats ps ON d.date = ps.date
+      LEFT JOIN event_stats es ON d.date = es.date
+      ORDER BY d.date DESC, ds.visits DESC, gs.visits DESC, ps.page_views DESC
+      LIMIT 1000
+    `;
+
+    const result = await clickhouse.query({
+      query: metricsQuery,
+      format: 'JSONEachRow'
+    });
+    
+    const data = await result.json();
+    
+    res.json({
+      data: data,
+      metadata: {
+        start_date,
+        end_date,
+        total_records: data.length,
+        generated_at: new Date().toISOString(),
+        data_source: 'clickhouse_analytics',
+        optimized_for: 'quicksight'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting QuickSight metrics:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve QuickSight metrics',
+      message: error.message
+    });
+  }
+});
+
+// Get user journey data for QuickSight
+router.get('/quicksight/user-journey', async (req, res) => {
+  try {
+    const { 
+      start_date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date = new Date().toISOString()
+    } = req.query;
+
+    const db = req.app.get('db');
+    
+    const journeyQuery = `
+      WITH user_sessions AS (
+        SELECT 
+          session_id,
+          user_id,
+          MIN(timestamp) as session_start,
+          MAX(timestamp) as session_end,
+          COUNT(*) as page_views,
+          SUM(duration_seconds) as total_session_time,
+          ARRAY_AGG(path ORDER BY timestamp) as page_sequence,
+          ARRAY_AGG(timestamp ORDER BY timestamp) as timestamp_sequence,
+          device_type,
+          browser,
+          country,
+          city
+        FROM analytics.page_visits 
+        WHERE timestamp >= $1 AND timestamp <= $2
+        GROUP BY session_id, user_id, device_type, browser, country, city
+      ),
+      session_events AS (
+        SELECT 
+          session_id,
+          COUNT(*) as total_events,
+          ARRAY_AGG(DISTINCT event_type) as event_types,
+          ARRAY_AGG(event_name ORDER BY timestamp) as event_sequence
+        FROM analytics.events 
+        WHERE timestamp >= $1 AND timestamp <= $2
+        GROUP BY session_id
+      )
+      SELECT 
+        us.session_id,
+        us.user_id,
+        us.session_start,
+        us.session_end,
+        us.page_views,
+        us.total_session_time,
+        us.page_sequence,
+        us.timestamp_sequence,
+        us.device_type,
+        us.browser,
+        us.country,
+        us.city,
+        COALESCE(se.total_events, 0) as total_events,
+        se.event_types,
+        se.event_sequence,
+        EXTRACT(EPOCH FROM (us.session_end - us.session_start)) as session_duration_seconds
+      FROM user_sessions us
+      LEFT JOIN session_events se ON us.session_id = se.session_id
+      ORDER BY us.session_start DESC
+      LIMIT 10000
+    `;
+
+    const result = await db.query(journeyQuery, [start_date, end_date]);
+    
+    res.json({
+      data: result.rows,
+      metadata: {
+        start_date,
+        end_date,
+        total_sessions: result.rows.length,
+        generated_at: new Date().toISOString(),
+        data_source: 'user_journey_analytics'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting user journey data:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve user journey data',
+      message: error.message
+    });
+  }
+});
+
+// Get conversion funnel data for QuickSight
+router.get('/quicksight/conversion-funnel', async (req, res) => {
+  try {
+    const { 
+      start_date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date = new Date().toISOString()
+    } = req.query;
+
+    const db = req.app.get('db');
+    
+    const funnelQuery = `
+      WITH funnel_steps AS (
+        SELECT 
+          DATE(timestamp) as date,
+          session_id,
+          CASE 
+            WHEN path = '/' THEN 'landing_page'
+            WHEN path LIKE '/products%' THEN 'product_view'
+            WHEN path LIKE '/cart%' THEN 'cart_view'
+            WHEN path LIKE '/checkout%' THEN 'checkout_start'
+            WHEN path LIKE '/order-confirmation%' THEN 'purchase_complete'
+            ELSE 'other_pages'
+          END as funnel_step,
+          MIN(timestamp) as step_timestamp
+        FROM analytics.page_visits 
+        WHERE timestamp >= $1 AND timestamp <= $2
+        GROUP BY DATE(timestamp), session_id, 
+                 CASE 
+                   WHEN path = '/' THEN 'landing_page'
+                   WHEN path LIKE '/products%' THEN 'product_view'
+                   WHEN path LIKE '/cart%' THEN 'cart_view'
+                   WHEN path LIKE '/checkout%' THEN 'checkout_start'
+                   WHEN path LIKE '/order-confirmation%' THEN 'purchase_complete'
+                   ELSE 'other_pages'
+                 END
+      ),
+      funnel_progression AS (
+        SELECT 
+          date,
+          funnel_step,
+          COUNT(DISTINCT session_id) as unique_sessions,
+          COUNT(*) as total_interactions
+        FROM funnel_steps
+        WHERE funnel_step != 'other_pages'
+        GROUP BY date, funnel_step
+      )
+      SELECT 
+        date,
+        'landing_page' as step_name,
+        1 as step_order,
+        COALESCE(unique_sessions, 0) as sessions,
+        COALESCE(total_interactions, 0) as interactions
+      FROM funnel_progression 
+      WHERE funnel_step = 'landing_page'
+      
+      UNION ALL
+      
+      SELECT 
+        date,
+        'product_view' as step_name,
+        2 as step_order,
+        COALESCE(unique_sessions, 0) as sessions,
+        COALESCE(total_interactions, 0) as interactions
+      FROM funnel_progression 
+      WHERE funnel_step = 'product_view'
+      
+      UNION ALL
+      
+      SELECT 
+        date,
+        'cart_view' as step_name,
+        3 as step_order,
+        COALESCE(unique_sessions, 0) as sessions,
+        COALESCE(total_interactions, 0) as interactions
+      FROM funnel_progression 
+      WHERE funnel_step = 'cart_view'
+      
+      UNION ALL
+      
+      SELECT 
+        date,
+        'checkout_start' as step_name,
+        4 as step_order,
+        COALESCE(unique_sessions, 0) as sessions,
+        COALESCE(total_interactions, 0) as interactions
+      FROM funnel_progression 
+      WHERE funnel_step = 'checkout_start'
+      
+      UNION ALL
+      
+      SELECT 
+        date,
+        'purchase_complete' as step_name,
+        5 as step_order,
+        COALESCE(unique_sessions, 0) as sessions,
+        COALESCE(total_interactions, 0) as interactions
+      FROM funnel_progression 
+      WHERE funnel_step = 'purchase_complete'
+      
+      ORDER BY date DESC, step_order ASC
+    `;
+
+    const result = await db.query(funnelQuery, [start_date, end_date]);
+    
+    res.json({
+      data: result.rows,
+      metadata: {
+        start_date,
+        end_date,
+        total_funnel_records: result.rows.length,
+        generated_at: new Date().toISOString(),
+        funnel_steps: ['landing_page', 'product_view', 'cart_view', 'checkout_start', 'purchase_complete']
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting conversion funnel data:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve conversion funnel data',
+      message: error.message
+    });
+  }
+});
+
+// Get gaming analytics for QuickSight
+router.get('/quicksight/gaming-analytics', async (req, res) => {
+  try {
+    const { 
+      start_date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date = new Date().toISOString()
+    } = req.query;
+
+    const clickhouse = req.app.get('clickhouse');
+    
+    const gamingQuery = `
+      WITH gaming_events AS (
+        SELECT 
+          toDate(timestamp) as date,
+          session_id,
+          user_id,
+          event_name,
+          JSONExtractString(properties, 'game_id') as game_id,
+          toFloat64OrZero(JSONExtractString(properties, 'score')) as score,
+          toInt32OrZero(JSONExtractString(properties, 'level')) as level,
+          toInt32OrZero(JSONExtractString(properties, 'duration')) as game_duration,
+          timestamp
+        FROM analytics.events 
+        WHERE timestamp >= toDateTime('${start_date}') AND timestamp <= toDateTime('${end_date}')
+        AND event_type = 'gaming'
+      ),
+      daily_gaming_stats AS (
+        SELECT 
+          date,
+          uniq(session_id) as active_gaming_sessions,
+          uniq(user_id) as active_gamers,
+          count(*) as total_gaming_events,
+          avg(score) as avg_score,
+          max(score) as max_score,
+          uniq(game_id) as unique_games_played
+        FROM gaming_events
+        GROUP BY date
+      )
+      SELECT 
+        date,
+        active_gaming_sessions,
+        active_gamers,
+        total_gaming_events,
+        round(avg_score, 2) as avg_score,
+        max_score,
+        unique_games_played,
+        round(total_gaming_events / greatest(active_gaming_sessions, 1), 2) as events_per_session
+      FROM daily_gaming_stats
+      ORDER BY date DESC
+    `;
+
+    const result = await clickhouse.query({
+      query: gamingQuery,
+      format: 'JSONEachRow'
+    });
+    
+    const data = await result.json();
+    
+    res.json({
+      data: data,
+      metadata: {
+        start_date,
+        end_date,
+        total_records: data.length,
+        generated_at: new Date().toISOString(),
+        analytics_type: 'gaming_performance',
+        data_source: 'clickhouse'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting gaming analytics:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve gaming analytics',
+      message: error.message
+    });
+  }
+});
+
+// Get click analytics specifically for QuickSight
+router.get('/quicksight/click-analytics', async (req, res) => {
+  try {
+    const { 
+      start_date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date = new Date().toISOString()
+    } = req.query;
+
+    const clickhouse = req.app.get('clickhouse');
+    
+    const clickQuery = `
+      SELECT 
+        toDate(timestamp) as date,
+        event_name as click_type,
+        JSONExtractString(properties, 'element_id') as element_id,
+        JSONExtractString(properties, 'page_url') as page_url,
+        count(*) as click_count,
+        uniq(session_id) as unique_sessions,
+        uniq(user_id) as unique_users,
+        country,
+        device_type,
+        browser
+      FROM analytics.events 
+      WHERE timestamp >= toDateTime('${start_date}') 
+        AND timestamp <= toDateTime('${end_date}')
+        AND event_type = 'click'
+      GROUP BY date, event_name, JSONExtractString(properties, 'element_id'), 
+               JSONExtractString(properties, 'page_url'), country, device_type, browser
+      ORDER BY date DESC, click_count DESC
+      LIMIT 1000
+    `;
+
+    const result = await clickhouse.query({
+      query: clickQuery,
+      format: 'JSONEachRow'
+    });
+    
+    const data = await result.json();
+    
+    res.json({
+      data: data,
+      metadata: {
+        start_date,
+        end_date,
+        total_records: data.length,
+        generated_at: new Date().toISOString(),
+        analytics_type: 'click_tracking',
+        data_source: 'clickhouse'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting click analytics:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve click analytics',
+      message: error.message
+    });
+  }
+});
+
+// Get scroll depth analytics for QuickSight
+router.get('/quicksight/scroll-analytics', async (req, res) => {
+  try {
+    const { 
+      start_date = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date = new Date().toISOString()
+    } = req.query;
+
+    const clickhouse = req.app.get('clickhouse');
+    
+    const scrollQuery = `
+      SELECT 
+        toDate(timestamp) as date,
+        event_name as scroll_depth_event,
+        toInt32OrZero(JSONExtractString(properties, 'scroll_depth')) as scroll_percentage,
+        count(*) as scroll_events,
+        uniq(session_id) as unique_sessions,
+        avg(toInt32OrZero(JSONExtractString(properties, 'page_height'))) as avg_page_height,
+        country,
+        device_type,
+        browser
+      FROM analytics.events 
+      WHERE timestamp >= toDateTime('${start_date}') 
+        AND timestamp <= toDateTime('${end_date}')
+        AND event_type = 'scroll'
+      GROUP BY date, event_name, toInt32OrZero(JSONExtractString(properties, 'scroll_depth')), 
+               country, device_type, browser
+      ORDER BY date DESC, scroll_percentage DESC
+      LIMIT 1000
+    `;
+
+    const result = await clickhouse.query({
+      query: scrollQuery,
+      format: 'JSONEachRow'
+    });
+    
+    const data = await result.json();
+    
+    res.json({
+      data: data,
+      metadata: {
+        start_date,
+        end_date,
+        total_records: data.length,
+        generated_at: new Date().toISOString(),
+        analytics_type: 'scroll_depth_tracking',
+        data_source: 'clickhouse'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting scroll analytics:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve scroll analytics',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

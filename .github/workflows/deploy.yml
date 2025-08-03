@@ -127,9 +127,9 @@ jobs:
           version: 'latest'
 
       - name: Setup Kustomize
-        run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-          sudo mv kustomize /usr/local/bin/
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: "5.0.0"
 
       - name: Configure kubectl for EKS
         run: |

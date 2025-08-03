@@ -1,124 +1,352 @@
-name: Deploy LUGX Gaming to EKS
+name: Deploy Gaming Microservices to EKS
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
 
 env:
   AWS_REGION: ap-southeast-1
   ECR_REGISTRY: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com
-  EKS_CLUSTER_NAME: lugx-gaming-cluster
+  EKS_CLUSTER_NAME: iit-test-dev-eks
+  NAMESPACE: lugx-gaming
 
 jobs:
-  build-and-deploy:
-    name: Build and Deploy
+  # Job 1: Build and Test
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: |
+            services/frontend/package-lock.json
+            services/gaming-service/package-lock.json
+            services/order-service/package-lock.json
+            services/analytics-service/package-lock.json
+
+      - name: Install dependencies and run tests - Frontend
+        run: |
+          cd services/frontend
+          npm ci
+          npm run test --if-present
+
+      - name: Install dependencies and run tests - Gaming Service
+        run: |
+          cd services/gaming-service
+          npm ci
+          npm run test --if-present
+
+      - name: Install dependencies and run tests - Order Service
+        run: |
+          cd services/order-service
+          npm ci
+          npm run test --if-present
+
+      - name: Install dependencies and run tests - Analytics Service
+        run: |
+          cd services/analytics-service
+          npm ci
+          npm run test --if-present
+
+  # Job 2: Build and Push Docker Images
+  build:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      frontend-tag: ${{ steps.tags.outputs.frontend-tag }}
+      gaming-tag: ${{ steps.tags.outputs.gaming-tag }}
+      order-tag: ${{ steps.tags.outputs.order-tag }}
+      analytics-tag: ${{ steps.tags.outputs.analytics-tag }}
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image tags
+        id: tags
+        run: |
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          GIT_HASH=$(git rev-parse --short HEAD)
+          TAG="v${TIMESTAMP}-${GIT_HASH}"
+          
+          echo "frontend-tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "gaming-tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "order-tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "analytics-tag=${TAG}" >> $GITHUB_OUTPUT
+          
+          echo "Generated tag: ${TAG}"
+
+      - name: Build and push Frontend
+        run: |
+          cd services/frontend
+          docker build --platform linux/amd64 -t $ECR_REGISTRY/gaming-microservices/frontend:${{ steps.tags.outputs.frontend-tag }} .
+          docker push $ECR_REGISTRY/gaming-microservices/frontend:${{ steps.tags.outputs.frontend-tag }}
+          
+          # Also push as latest
+          docker tag $ECR_REGISTRY/gaming-microservices/frontend:${{ steps.tags.outputs.frontend-tag }} $ECR_REGISTRY/gaming-microservices/frontend:latest
+          docker push $ECR_REGISTRY/gaming-microservices/frontend:latest
+
+      - name: Build and push Gaming Service
+        run: |
+          cd services/gaming-service
+          docker build --platform linux/amd64 -t $ECR_REGISTRY/gaming-microservices/gaming-service:${{ steps.tags.outputs.gaming-tag }} .
+          docker push $ECR_REGISTRY/gaming-microservices/gaming-service:${{ steps.tags.outputs.gaming-tag }}
+          
+          docker tag $ECR_REGISTRY/gaming-microservices/gaming-service:${{ steps.tags.outputs.gaming-tag }} $ECR_REGISTRY/gaming-microservices/gaming-service:latest
+          docker push $ECR_REGISTRY/gaming-microservices/gaming-service:latest
+
+      - name: Build and push Order Service
+        run: |
+          cd services/order-service
+          docker build --platform linux/amd64 -t $ECR_REGISTRY/gaming-microservices/order-service:${{ steps.tags.outputs.order-tag }} .
+          docker push $ECR_REGISTRY/gaming-microservices/order-service:${{ steps.tags.outputs.order-tag }}
+          
+          docker tag $ECR_REGISTRY/gaming-microservices/order-service:${{ steps.tags.outputs.order-tag }} $ECR_REGISTRY/gaming-microservices/order-service:latest
+          docker push $ECR_REGISTRY/gaming-microservices/order-service:latest
+
+      - name: Build and push Analytics Service
+        run: |
+          cd services/analytics-service
+          docker build --platform linux/amd64 -t $ECR_REGISTRY/gaming-microservices/analytics-service:${{ steps.tags.outputs.analytics-tag }} .
+          docker push $ECR_REGISTRY/gaming-microservices/analytics-service:${{ steps.tags.outputs.analytics-tag }}
+          
+          docker tag $ECR_REGISTRY/gaming-microservices/analytics-service:${{ steps.tags.outputs.analytics-tag }} $ECR_REGISTRY/gaming-microservices/analytics-service:latest
+          docker push $ECR_REGISTRY/gaming-microservices/analytics-service:latest
+
+  # Job 3: Deploy to Kubernetes
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment: 
+      name: ${{ github.event.inputs.environment || 'dev' }}
     
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set environment
-      run: |
-        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
-          echo "IMAGE_TAG=latest-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
-        else
-          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
-          echo "IMAGE_TAG=dev-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
-        fi
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
 
-    - name: Login to ECR
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Setup Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
 
-    - name: Build and push images
-      run: |
-        services=("frontend" "gaming-service" "order-service" "analytics-service")
-        
-        for service in "${services[@]}"; do
-          echo "🏗️ Building $service..."
-          IMAGE_URI="${ECR_REGISTRY}/lugx-gaming/$service:$IMAGE_TAG"
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+      - name: Update Kustomization with new image tags
+        run: |
+          # Update image tags in kustomization.yaml
+          cd kustomize/overlays/dev
           
-          docker build -t $IMAGE_URI ./services/$service/
-          docker push $IMAGE_URI
+          # Create backup
+          cp kustomization.yaml kustomization.yaml.backup
           
-          echo "✅ Pushed: $IMAGE_URI"
-        done
+          # Update each service individually for precision
+          awk -v frontend="${{ needs.build.outputs.frontend-tag }}" -v gaming="${{ needs.build.outputs.gaming-tag }}" -v order="${{ needs.build.outputs.order-tag }}" -v analytics="${{ needs.build.outputs.analytics-tag }}" '
+          /- name:.*\/frontend$/ { 
+              print $0
+              getline
+              if ($0 ~ /newTag:/) {
+                  print "  newTag: " frontend
+              } else {
+                  print $0
+              }
+              next
+          }
+          /- name:.*\/gaming-service$/ { 
+              print $0
+              getline
+              if ($0 ~ /newTag:/) {
+                  print "  newTag: " gaming
+              } else {
+                  print $0
+              }
+              next
+          }
+          /- name:.*\/order-service$/ { 
+              print $0
+              getline
+              if ($0 ~ /newTag:/) {
+                  print "  newTag: " order
+              } else {
+                  print $0
+              }
+              next
+          }
+          /- name:.*\/analytics-service$/ { 
+              print $0
+              getline
+              if ($0 ~ /newTag:/) {
+                  print "  newTag: " analytics
+              } else {
+                  print $0
+              }
+              next
+          }
+          { print $0 }
+          ' kustomization.yaml.backup > kustomization.yaml
+          
+          # Verify kustomization
+          echo "Updated kustomization.yaml:"
+          cat kustomization.yaml
+          
+          # Test kustomize build
+          kustomize build . > /dev/null
 
-    - name: Setup kubectl and Kustomize
-      run: |
-        # Install kubectl
-        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-        chmod +x kubectl
-        sudo mv kubectl /usr/local/bin/
-        
-        # Install kustomize
-        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-        sudo mv kustomize /usr/local/bin/
+      - name: Setup Database Security Groups
+        run: |
+          # Configure RDS security groups for EKS access
+          echo "Configuring RDS security groups for EKS access..."
+          
+          # Get RDS and EKS security group IDs
+          RDS_SG_ID=$(aws rds describe-db-instances --region $AWS_REGION --query "DBInstances[?DBInstanceIdentifier=='iit-test-dev-db'].VpcSecurityGroups[0].VpcSecurityGroupId" --output text 2>/dev/null || echo "None")
+          EKS_SG_ID=$(aws eks describe-cluster --region $AWS_REGION --name $EKS_CLUSTER_NAME --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" --output text 2>/dev/null || echo "None")
+          VPC_ID=$(aws eks describe-cluster --region $AWS_REGION --name $EKS_CLUSTER_NAME --query "cluster.resourcesVpcConfig.vpcId" --output text 2>/dev/null || echo "None")
+          VPC_CIDR=$(aws ec2 describe-vpcs --region $AWS_REGION --vpc-ids $VPC_ID --query "Vpcs[0].CidrBlock" --output text 2>/dev/null || echo "None")
+          
+          if [ "$RDS_SG_ID" != "None" ] && [ "$VPC_CIDR" != "None" ]; then
+            echo "Adding VPC CIDR rule to RDS security group..."
+            aws ec2 authorize-security-group-ingress \
+              --region $AWS_REGION \
+              --group-id $RDS_SG_ID \
+              --protocol tcp \
+              --port 5432 \
+              --cidr $VPC_CIDR \
+              2>/dev/null || echo "Rule may already exist"
+          fi
 
-    - name: Configure kubectl for EKS
-      run: |
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        kubectl cluster-info
+      - name: Deploy to Kubernetes
+        run: |
+          echo "Deploying to Kubernetes cluster: $EKS_CLUSTER_NAME"
+          
+          # Apply kustomization
+          kubectl apply -k kustomize/overlays/dev/
+          
+          # Wait for deployments to be ready
+          echo "Waiting for deployments to be ready..."
+          kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/gaming-service -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/order-service -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/analytics-service -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/clickhouse -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/health-check -n $NAMESPACE --timeout=300s
 
-    - name: Update Kustomize with new images
-      run: |
-        cd kustomize/overlays/$ENVIRONMENT
-        
-        # Update image tags
-        kustomize edit set image \
-          frontend=${{ env.ECR_REGISTRY }}/lugx-gaming/frontend:${{ env.IMAGE_TAG }} \
-          gaming-service=${{ env.ECR_REGISTRY }}/lugx-gaming/gaming-service:${{ env.IMAGE_TAG }} \
-          order-service=${{ env.ECR_REGISTRY }}/lugx-gaming/order-service:${{ env.IMAGE_TAG }} \
-          analytics-service=${{ env.ECR_REGISTRY }}/lugx-gaming/analytics-service:${{ env.IMAGE_TAG }}
+      - name: Verify Deployment
+        run: |
+          echo "Verifying deployment status..."
+          
+          # Check pod status
+          echo "Pod Status:"
+          kubectl get pods -n $NAMESPACE -o wide
+          
+          # Check deployment status
+          echo "Deployment Status:"
+          kubectl get deployments -n $NAMESPACE
+          
+          # Check services
+          echo "Services:"
+          kubectl get services -n $NAMESPACE
+          
+          # Get running pod count
+          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE --field-selector=status.phase=Running --no-headers | wc -l)
+          TOTAL_PODS=$(kubectl get pods -n $NAMESPACE --no-headers | wc -l)
+          
+          echo "Status Summary: $RUNNING_PODS/$TOTAL_PODS pods running"
+          
+          if [ $RUNNING_PODS -eq $TOTAL_PODS ] && [ $RUNNING_PODS -gt 0 ]; then
+            echo "✅ All deployments are healthy!"
+          else
+            echo "⚠️ Some pods may not be ready"
+            kubectl get pods -n $NAMESPACE --field-selector=status.phase!=Running
+            exit 1
+          fi
 
-    - name: Deploy to EKS
-      run: |
-        echo "🚀 Deploying to EKS ($ENVIRONMENT environment)..."
-        
-        # Apply Kustomize configuration
-        kustomize build kustomize/overlays/$ENVIRONMENT | kubectl apply -f -
-        
-        echo "✅ Deployment applied"
+      - name: Get Application URLs
+        run: |
+          echo "Application URLs:"
+          
+          # Get LoadBalancer services
+          FRONTEND_SERVICE=$(kubectl get svc frontend-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
+          HEALTH_SERVICE=$(kubectl get svc health-check-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
+          
+          if [ "$FRONTEND_SERVICE" != "pending" ] && [ -n "$FRONTEND_SERVICE" ]; then
+            echo "Frontend: http://$FRONTEND_SERVICE"
+          else
+            echo "Frontend: LoadBalancer pending... Use port-forward: kubectl port-forward svc/frontend-service 3000:80 -n $NAMESPACE"
+          fi
+          
+          if [ "$HEALTH_SERVICE" != "pending" ] && [ -n "$HEALTH_SERVICE" ]; then
+            echo "Health Dashboard: http://$HEALTH_SERVICE"
+          else
+            echo "Health Dashboard: Use port-forward: kubectl port-forward svc/health-check-service 8080:80 -n $NAMESPACE"
+          fi
 
-    - name: Wait for rollout
-      run: |
-        echo "⏳ Waiting for deployments..."
-        
-        kubectl rollout status deployment/frontend -n lugx-gaming --timeout=300s
-        kubectl rollout status deployment/gaming-service -n lugx-gaming --timeout=300s
-        kubectl rollout status deployment/order-service -n lugx-gaming --timeout=300s
-        kubectl rollout status deployment/analytics-service -n lugx-gaming --timeout=300s
-        
-        echo "✅ All deployments ready!"
+  # Job 4: Notify on completion
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [build, deploy]
+    if: always()
+    
+    steps:
+      - name: Deployment Success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "🎉 Deployment completed successfully!"
+          echo "Images deployed:"
+          echo "- Frontend: ${{ needs.build.outputs.frontend-tag }}"
+          echo "- Gaming Service: ${{ needs.build.outputs.gaming-tag }}"
+          echo "- Order Service: ${{ needs.build.outputs.order-tag }}"
+          echo "- Analytics Service: ${{ needs.build.outputs.analytics-tag }}"
 
-    - name: Verify deployment
-      run: |
-        echo "🔍 Deployment status:"
-        kubectl get pods -n lugx-gaming
-        kubectl get services -n lugx-gaming
-        kubectl get ingress -n lugx-gaming
-        
-        # Check for failed pods
-        FAILED=$(kubectl get pods -n lugx-gaming --field-selector=status.phase!=Running --no-headers | wc -l)
-        if [ "$FAILED" -gt 0 ]; then
-          echo "❌ Some pods failed:"
-          kubectl get pods -n lugx-gaming --field-selector=status.phase!=Running
+      - name: Deployment Failed
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
           exit 1
-        fi
-        
-        echo "🎉 Deployment successful!"
-        echo "Environment: $ENVIRONMENT"
-        echo "Image tag: $IMAGE_TAG"

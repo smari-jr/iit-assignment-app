@@ -1,0 +1,213 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: 'Image tag to rollback to (e.g., v20250803-171506-fa20cda)'
+        required: true
+        type: string
+      service:
+        description: 'Service to rollback (or "all" for all services)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - frontend
+        - gaming-service
+        - order-service
+        - analytics-service
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REGISTRY: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com
+  EKS_CLUSTER_NAME: iit-test-dev-eks
+  NAMESPACE: lugx-gaming
+
+jobs:
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    environment: 
+      name: rollback
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Setup Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+      - name: Verify rollback image exists
+        run: |
+          ROLLBACK_TAG="${{ github.event.inputs.rollback_to }}"
+          SERVICE="${{ github.event.inputs.service }}"
+          
+          if [ "$SERVICE" = "all" ]; then
+            SERVICES=("frontend" "gaming-service" "order-service" "analytics-service")
+          else
+            SERVICES=("$SERVICE")
+          fi
+          
+          echo "Verifying images exist for rollback tag: $ROLLBACK_TAG"
+          
+          for service in "${SERVICES[@]}"; do
+            echo "Checking $service:$ROLLBACK_TAG..."
+            aws ecr describe-images \
+              --repository-name gaming-microservices/$service \
+              --image-ids imageTag=$ROLLBACK_TAG \
+              --region $AWS_REGION > /dev/null
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ $service:$ROLLBACK_TAG exists"
+            else
+              echo "❌ $service:$ROLLBACK_TAG not found in ECR"
+              exit 1
+            fi
+          done
+
+      - name: Update Kustomization for rollback
+        run: |
+          ROLLBACK_TAG="${{ github.event.inputs.rollback_to }}"
+          SERVICE="${{ github.event.inputs.service }}"
+          
+          cd kustomize/overlays/dev
+          
+          # Create backup
+          cp kustomization.yaml kustomization.yaml.backup
+          
+          echo "Rolling back $SERVICE to $ROLLBACK_TAG"
+          
+          if [ "$SERVICE" = "all" ]; then
+            # Rollback all services
+            awk -v tag="$ROLLBACK_TAG" '
+            /- name:.*\/(frontend|gaming-service|order-service|analytics-service)$/ { 
+                print $0
+                getline
+                if ($0 ~ /newTag:/) {
+                    print "  newTag: " tag
+                } else {
+                    print $0
+                }
+                next
+            }
+            { print $0 }
+            ' kustomization.yaml.backup > kustomization.yaml
+          else
+            # Rollback specific service
+            awk -v service="$SERVICE" -v tag="$ROLLBACK_TAG" '
+            BEGIN { pattern = "- name:.*/" service "$" }
+            $0 ~ pattern { 
+                print $0
+                getline
+                if ($0 ~ /newTag:/) {
+                    print "  newTag: " tag
+                } else {
+                    print $0
+                }
+                next
+            }
+            { print $0 }
+            ' kustomization.yaml.backup > kustomization.yaml
+          fi
+          
+          # Show changes
+          echo "Updated kustomization.yaml:"
+          cat kustomization.yaml
+          
+          # Test kustomize build
+          kustomize build . > /dev/null
+
+      - name: Apply rollback
+        run: |
+          echo "🔄 Applying rollback to Kubernetes..."
+          
+          # Apply kustomization
+          kubectl apply -k kustomize/overlays/dev/
+          
+          SERVICE="${{ github.event.inputs.service }}"
+          
+          if [ "$SERVICE" = "all" ]; then
+            echo "⏳ Waiting for all deployments to rollback..."
+            kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+            kubectl rollout status deployment/gaming-service -n $NAMESPACE --timeout=300s
+            kubectl rollout status deployment/order-service -n $NAMESPACE --timeout=300s
+            kubectl rollout status deployment/analytics-service -n $NAMESPACE --timeout=300s
+          else
+            echo "⏳ Waiting for $SERVICE deployment to rollback..."
+            kubectl rollout status deployment/$SERVICE -n $NAMESPACE --timeout=300s
+          fi
+
+      - name: Verify rollback
+        run: |
+          SERVICE="${{ github.event.inputs.service }}"
+          ROLLBACK_TAG="${{ github.event.inputs.rollback_to }}"
+          
+          echo "🔍 Verifying rollback status..."
+          
+          # Check pod status
+          echo "Pod Status:"
+          kubectl get pods -n $NAMESPACE -o wide
+          
+          # Check deployment status
+          echo "Deployment Status:"
+          kubectl get deployments -n $NAMESPACE
+          
+          # Verify image tags
+          if [ "$SERVICE" = "all" ]; then
+            SERVICES=("frontend" "gaming-service" "order-service" "analytics-service")
+          else
+            SERVICES=("$SERVICE")
+          fi
+          
+          echo "Verifying image tags:"
+          for service in "${SERVICES[@]}"; do
+            CURRENT_IMAGE=$(kubectl get deployment $service -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}')
+            echo "$service: $CURRENT_IMAGE"
+            
+            if [[ "$CURRENT_IMAGE" == *":$ROLLBACK_TAG" ]]; then
+              echo "✅ $service successfully rolled back to $ROLLBACK_TAG"
+            else
+              echo "❌ $service rollback failed - current image: $CURRENT_IMAGE"
+              exit 1
+            fi
+          done
+          
+          # Get running pod count
+          RUNNING_PODS=$(kubectl get pods -n $NAMESPACE --field-selector=status.phase=Running --no-headers | wc -l)
+          TOTAL_PODS=$(kubectl get pods -n $NAMESPACE --no-headers | wc -l)
+          
+          echo "Status Summary: $RUNNING_PODS/$TOTAL_PODS pods running"
+          
+          if [ $RUNNING_PODS -eq $TOTAL_PODS ] && [ $RUNNING_PODS -gt 0 ]; then
+            echo "✅ Rollback completed successfully!"
+          else
+            echo "⚠️ Some pods may not be ready after rollback"
+            kubectl get pods -n $NAMESPACE --field-selector=status.phase!=Running
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd kustomize/overlays/dev
+          rm -f kustomization.yaml.backup

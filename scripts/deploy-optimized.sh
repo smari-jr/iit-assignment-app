@@ -232,8 +232,8 @@ namespace: lugx-gaming
 resources:
 - ../../base
 
-patches:
-- path: config-patch.yaml
+patchesStrategicMerge:
+- config-patch.yaml
 
 labels:
 - pairs:
@@ -283,50 +283,48 @@ update_kustomization() {
     # Create a backup of the original file
     cp kustomize/overlays/dev/kustomization.yaml kustomize/overlays/dev/kustomization.yaml.backup
     
-    # Use a more reliable approach with Python or Perl if available, otherwise use sed
-    if command -v python3 &> /dev/null; then
-        # Use Python for more reliable text replacement
-        python3 -c "
-import re
-import sys
+    # Create a new kustomization.yaml with updated tags
+    cat > kustomize/overlays/dev/kustomization.yaml << EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 
-# Read the file
-with open('kustomize/overlays/dev/kustomization.yaml', 'r') as f:
-    content = f.read()
+namespace: lugx-gaming
 
-# Update image tags
-content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend\s*\n\s*newTag:) .*', r'\1 ${frontend_tag}', content)
-content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service\s*\n\s*newTag:) .*', r'\1 ${gaming_tag}', content)
-content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service\s*\n\s*newTag:) .*', r'\1 ${order_tag}', content)
-content = re.sub(r'(- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service\s*\n\s*newTag:) .*', r'\1 ${analytics_tag}', content)
+resources:
+- ../../base
 
-# Write back
-with open('kustomize/overlays/dev/kustomization.yaml', 'w') as f:
-    f.write(content)
-"
-    else
-        # Fallback to sed with proper escaping
-        local ecr_escaped=$(echo "${ECR_REGISTRY}" | sed 's/[[\.*^$()+?{|]/\\&/g')
-        local repo_escaped=$(echo "${REPO_PREFIX}" | sed 's/[[\.*^$()+?{|]/\\&/g')
-        
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS sed
-            sed -i '' "s|newTag: .*|newTag: ${frontend_tag}|" kustomize/overlays/dev/kustomization.yaml
-            sed -i '' "s|newTag: .*|newTag: ${gaming_tag}|" kustomize/overlays/dev/kustomization.yaml
-            sed -i '' "s|newTag: .*|newTag: ${order_tag}|" kustomize/overlays/dev/kustomization.yaml
-            sed -i '' "s|newTag: .*|newTag: ${analytics_tag}|" kustomize/overlays/dev/kustomization.yaml
-        else
-            # Linux sed - Update each service individually
-            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/frontend/{n;s/newTag: .*/newTag: ${frontend_tag}/;}" kustomize/overlays/dev/kustomization.yaml
-            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/gaming-service/{n;s/newTag: .*/newTag: ${gaming_tag}/;}" kustomize/overlays/dev/kustomization.yaml
-            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/order-service/{n;s/newTag: .*/newTag: ${order_tag}/;}" kustomize/overlays/dev/kustomization.yaml
-            sed -i "/- name: ${ecr_escaped}\/${repo_escaped}\/analytics-service/{n;s/newTag: .*/newTag: ${analytics_tag}/;}" kustomize/overlays/dev/kustomization.yaml
-        fi
-    fi
+patchesStrategicMerge:
+- config-patch.yaml
+
+labels:
+- pairs:
+    environment: development
+    app.kubernetes.io/instance: dev
+
+images:
+- name: ${ECR_REGISTRY}/${REPO_PREFIX}/frontend
+  newTag: ${frontend_tag}
+- name: ${ECR_REGISTRY}/${REPO_PREFIX}/gaming-service
+  newTag: ${gaming_tag}
+- name: ${ECR_REGISTRY}/${REPO_PREFIX}/order-service
+  newTag: ${order_tag}
+- name: ${ECR_REGISTRY}/${REPO_PREFIX}/analytics-service
+  newTag: ${analytics_tag}
+
+replicas:
+- name: frontend
+  count: 1
+- name: gaming-service
+  count: 1
+- name: order-service
+  count: 1
+- name: analytics-service
+  count: 1
+EOF
     
     # Verify the changes were made
     log "Verifying updated image tags:"
-    grep -A 1 "- name: ${ECR_REGISTRY}/${REPO_PREFIX}" kustomize/overlays/dev/kustomization.yaml || true
+    grep -A 1 "- name: ${ECR_REGISTRY}/${REPO_PREFIX}" kustomize/overlays/dev/kustomization.yaml 2>/dev/null || log "Could not verify image tags with grep"
     
     # Verify the dev overlay kustomization is valid
     log "Validating updated kustomization..."

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: analytics-service
-        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service:clickhouse-fixed
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service:clickhouse-url-fixed
         imagePullPolicy: Always
         ports:
         - containerPort: 3003

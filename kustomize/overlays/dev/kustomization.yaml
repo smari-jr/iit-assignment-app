@@ -7,7 +7,8 @@ resources:
 - ../../base
 
 patches:
-- path: config-patch.yaml
+- path: configmap-patch.yaml
+- path: secret-patch.yaml
 
 labels:
 - pairs:
@@ -16,13 +17,13 @@ labels:
 
 images:
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend
-  newTag: v20250803-171506-fa20cda
+  newTag: v20250803-164729-5e2e7e5
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service
-  newTag: v20250803-171520-fa20cda
+  newTag: v20250803-164729-5e2e7e5
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service
-  newTag: v20250803-171528-fa20cda
+  newTag: v20250803-164729-5e2e7e5
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service
-  newTag: v20250803-171534-fa20cda
+  newTag: v20250803-164729-5e2e7e5
 
 replicas:
 - name: frontend

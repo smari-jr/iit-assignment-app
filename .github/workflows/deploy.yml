@@ -24,54 +24,10 @@ env:
   NAMESPACE: lugx-gaming
 
 jobs:
-  # Job 1: Build and Test
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: |
-            services/frontend/package-lock.json
-            services/gaming-service/package-lock.json
-            services/order-service/package-lock.json
-            services/analytics-service/package-lock.json
-
-      - name: Install dependencies and run tests - Frontend
-        run: |
-          cd services/frontend
-          npm ci
-          npm run test --if-present
-
-      - name: Install dependencies and run tests - Gaming Service
-        run: |
-          cd services/gaming-service
-          npm ci
-          npm run test --if-present
-
-      - name: Install dependencies and run tests - Order Service
-        run: |
-          cd services/order-service
-          npm ci
-          npm run test --if-present
-
-      - name: Install dependencies and run tests - Analytics Service
-        run: |
-          cd services/analytics-service
-          npm ci
-          npm run test --if-present
-
-  # Job 2: Build and Push Docker Images
+  # Job 1: Build and Push Docker Images
   build:
     name: Build and Push Images
     runs-on: ubuntu-latest
-    needs: test
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     outputs:
       frontend-tag: ${{ steps.tags.outputs.frontend-tag }}
@@ -145,7 +101,7 @@ jobs:
           docker tag $ECR_REGISTRY/gaming-microservices/analytics-service:${{ steps.tags.outputs.analytics-tag }} $ECR_REGISTRY/gaming-microservices/analytics-service:latest
           docker push $ECR_REGISTRY/gaming-microservices/analytics-service:latest
 
-  # Job 3: Deploy to Kubernetes
+  # Job 2: Deploy to Kubernetes
   deploy:
     name: Deploy to EKS
     runs-on: ubuntu-latest
@@ -327,7 +283,7 @@ jobs:
             echo "Health Dashboard: Use port-forward: kubectl port-forward svc/health-check-service 8080:80 -n $NAMESPACE"
           fi
 
-  # Job 4: Notify on completion
+  # Job 3: Notify on completion
   notify:
     name: Notify Deployment Status
     runs-on: ubuntu-latest

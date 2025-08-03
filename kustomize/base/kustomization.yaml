@@ -5,7 +5,6 @@ resources:
   - namespace.yaml
   - config.yaml
   - secrets.yaml
-  - postgres.yaml
   - clickhouse.yaml
   - frontend.yaml
   - gaming-service.yaml

@@ -101,7 +101,7 @@ data:
                 <li>Order Service: order-service:3002</li>
                 <li>Analytics Service: analytics-service:3003</li>
                 <li>Frontend: frontend-service:80</li>
-                <li>PostgreSQL: postgres-service:5432</li>
+                <li>PostgreSQL: External RDS Database</li>
                 <li>ClickHouse: clickhouse-service:8123</li>
             </ul>
         </div>

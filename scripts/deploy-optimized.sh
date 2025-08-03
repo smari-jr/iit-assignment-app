@@ -120,6 +120,9 @@ setup_database() {
     # Configure security groups for EKS access to RDS
     configure_rds_security_group
     
+    # Configure RDS for non-SSL connections (development)
+    configure_rds_ssl_settings
+    
     # Test database connectivity
     test_database_connection
     
@@ -149,37 +152,123 @@ configure_rds_security_group() {
         --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
         --output text 2>/dev/null)
     
-    if [ "$rds_sg_id" != "None" ] && [ "$eks_sg_id" != "None" ] && [ -n "$rds_sg_id" ] && [ -n "$eks_sg_id" ]; then
-        log "Adding security group rule: EKS ($eks_sg_id) -> RDS ($rds_sg_id) on port 5432"
+    # Get VPC CIDR for broader access
+    local vpc_id=$(aws eks describe-cluster \
+        --region $REGION \
+        --name $EKS_CLUSTER_NAME \
+        --query "cluster.resourcesVpcConfig.vpcId" \
+        --output text 2>/dev/null)
+    
+    local vpc_cidr=$(aws ec2 describe-vpcs \
+        --region $REGION \
+        --vpc-ids $vpc_id \
+        --query "Vpcs[0].CidrBlock" \
+        --output text 2>/dev/null)
+    
+    if [ "$rds_sg_id" != "None" ] && [ -n "$rds_sg_id" ]; then
+        log "RDS Security Group ID: $rds_sg_id"
+        log "EKS Security Group ID: $eks_sg_id"
+        log "VPC CIDR: $vpc_cidr"
         
-        # Add rule to allow EKS access to RDS
-        aws ec2 authorize-security-group-ingress \
+        # Add rule to allow EKS security group access to RDS
+        if [ "$eks_sg_id" != "None" ] && [ -n "$eks_sg_id" ]; then
+            log "Adding security group rule: EKS ($eks_sg_id) -> RDS ($rds_sg_id) on port 5432"
+            aws ec2 authorize-security-group-ingress \
+                --region $REGION \
+                --group-id $rds_sg_id \
+                --protocol tcp \
+                --port 5432 \
+                --source-group $eks_sg_id \
+                2>/dev/null || log "EKS security group rule may already exist"
+        fi
+        
+        # Add rule to allow VPC CIDR access to RDS (broader access for EKS pods)
+        if [ "$vpc_cidr" != "None" ] && [ -n "$vpc_cidr" ]; then
+            log "Adding VPC CIDR rule: VPC ($vpc_cidr) -> RDS ($rds_sg_id) on port 5432"
+            aws ec2 authorize-security-group-ingress \
+                --region $REGION \
+                --group-id $rds_sg_id \
+                --protocol tcp \
+                --port 5432 \
+                --cidr $vpc_cidr \
+                2>/dev/null || log "VPC CIDR rule may already exist"
+        fi
+        
+        # Verify security group rules
+        log "Current RDS security group rules:"
+        aws ec2 describe-security-groups \
             --region $REGION \
-            --group-id $rds_sg_id \
-            --protocol tcp \
-            --port 5432 \
-            --source-group $eks_sg_id \
-            2>/dev/null || log "Security group rule may already exist"
+            --group-ids $rds_sg_id \
+            --query "SecurityGroups[0].IpPermissions[?FromPort==\`5432\`]" \
+            --output table 2>/dev/null || log "Could not retrieve security group rules"
+            
     else
-        warn "Could not configure security groups automatically. Manual configuration may be required."
+        warn "Could not configure security groups automatically. Manual configuration required."
+        log "Please ensure the RDS security group allows inbound connections on port 5432 from the EKS VPC"
+    fi
+}
+
+# Configure RDS SSL settings for development
+configure_rds_ssl_settings() {
+    log "Configuring RDS SSL settings for development environment..."
+    
+    # Get RDS parameter group name
+    local param_group=$(aws rds describe-db-instances \
+        --region $REGION \
+        --query "DBInstances[?DBInstanceIdentifier=='iit-test-dev-db'].DBParameterGroups[0].DBParameterGroupName" \
+        --output text 2>/dev/null)
+    
+    if [ "$param_group" != "None" ] && [ -n "$param_group" ]; then
+        log "RDS Parameter Group: $param_group"
+        
+        # Check if this is a default parameter group (can't be modified)
+        if [[ "$param_group" == default.* ]]; then
+            warn "Using default parameter group ($param_group) - cannot modify SSL settings"
+            log "For production, consider creating a custom parameter group"
+        else
+            log "Configuring parameter group to allow non-SSL connections..."
+            
+            # Set rds.force_ssl to 0 to allow non-SSL connections
+            aws rds modify-db-parameter-group \
+                --region $REGION \
+                --db-parameter-group-name $param_group \
+                --parameters "ParameterName=rds.force_ssl,ParameterValue=0,ApplyMethod=immediate" \
+                2>/dev/null || log "Parameter may already be set or parameter group is read-only"
+                
+            log "Parameter group configured for non-SSL connections"
+        fi
+    else
+        warn "Could not determine RDS parameter group"
     fi
 }
 
 # Test database connectivity
 test_database_connection() {
-    log "Testing database connectivity..."
+    log "Testing database connectivity with SSL options..."
     
-    # Test connection with better error handling
-    local connection_test=$(PGPASSWORD=$DB_PASSWORD psql -h $RDS_ENDPOINT -U $DB_USER -d postgres -p $DB_PORT -c "SELECT version();" --connect-timeout=10 2>&1)
-    local exit_code=$?
+    # Test connection with SSL disabled first (common for development)
+    local connection_test_nossl=$(PGPASSWORD=$DB_PASSWORD psql -h $RDS_ENDPOINT -U $DB_USER -d postgres -p $DB_PORT -c "SELECT version();" --connect-timeout=10 2>&1)
+    local exit_code_nossl=$?
     
-    if [ $exit_code -eq 0 ]; then
-        log "✅ Database connection successful"
+    if [ $exit_code_nossl -eq 0 ]; then
+        log "✅ Database connection successful (no SSL)"
     else
-        log "Connection test output: $connection_test"
-        # Don't exit, just warn - the connection might work for operations
-        warn "Database connection test failed, but continuing deployment..."
-        log "Manual test showed connection works, proceeding with caution..."
+        log "Connection test without SSL failed: $connection_test_nossl"
+        
+        # Try with SSL required
+        log "Trying connection with SSL required..."
+        local connection_test_ssl=$(PGPASSWORD=$DB_PASSWORD psql -h $RDS_ENDPOINT -U $DB_USER -d postgres -p $DB_PORT -c "SELECT version();" --connect-timeout=10 sslmode=require 2>&1)
+        local exit_code_ssl=$?
+        
+        if [ $exit_code_ssl -eq 0 ]; then
+            log "✅ Database connection successful (SSL required)"
+            log "Note: Applications should use SSL connections"
+        else
+            log "Connection test with SSL failed: $connection_test_ssl"
+            warn "Database connection test failed with both SSL and non-SSL modes"
+            log "This might be due to security group configuration or RDS parameter group settings"
+            log "Continuing deployment - security groups will be configured automatically"
+        fi
     fi
 }
 

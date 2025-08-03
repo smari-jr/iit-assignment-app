@@ -15,6 +15,7 @@ spec:
       containers:
       - name: order-service
         image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service:v20250803-171528-fa20cda
+        imagePullPolicy: Always
         ports:
         - containerPort: 3002
         env:

@@ -67,8 +67,7 @@ spec:
           periodSeconds: 5
       volumes:
       - name: clickhouse-storage
-        persistentVolumeClaim:
-          claimName: clickhouse-pvc
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -89,15 +88,3 @@ spec:
     name: native
   selector:
     app: clickhouse
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: clickhouse-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: gp2
-  resources:
-    requests:
-      storage: 20Gi

@@ -79,6 +79,18 @@ check_prerequisites() {
         error "Kustomize directory 'kustomize/base' not found."
     fi
     
+    # Ensure base kustomization.yaml exists
+    if [[ ! -f "kustomize/base/kustomization.yaml" ]]; then
+        warn "Base kustomization.yaml not found. Creating it..."
+        create_base_kustomization
+    fi
+    
+    # Ensure dev overlay kustomization.yaml exists if dev directory exists
+    if [[ -d "kustomize/overlays/dev" ]] && [[ ! -f "kustomize/overlays/dev/kustomization.yaml" ]]; then
+        warn "Dev overlay kustomization.yaml not found. Creating it..."
+        create_dev_overlay_kustomization
+    fi
+    
     if ! command -v aws &> /dev/null; then
         error "AWS CLI not found. Please install AWS CLI."
     fi
@@ -152,6 +164,559 @@ build_and_push() {
     
     log "Successfully pushed ${service}:${tag}" >&2
     echo "${tag}"
+}
+
+# Create base kustomization.yaml if missing
+create_base_kustomization() {
+    log "Creating base kustomization.yaml..."
+    cat > kustomize/base/kustomization.yaml << 'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - secrets.yaml
+  - postgres.yaml
+  - clickhouse.yaml
+  - frontend.yaml
+  - gaming-service.yaml
+  - order-service.yaml
+  - analytics-service.yaml
+  - ingress.yaml
+  - network-policy.yaml
+  - health-check.yaml
+
+labels:
+- pairs:
+    app: gaming-microservices
+    version: v1.0.0
+
+namespace: gaming-microservices
+EOF
+    log "Base kustomization.yaml created successfully!"
+    
+    # Also create all required base YAML files if they don't exist
+    create_base_yaml_files
+}
+
+# Create all base YAML files if missing
+create_base_yaml_files() {
+    log "Checking and creating missing base YAML files..."
+    
+    # Create namespace.yaml
+    if [[ ! -f "kustomize/base/namespace.yaml" ]]; then
+        log "Creating namespace.yaml..."
+        cat > kustomize/base/namespace.yaml << 'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gaming-microservices
+  labels:
+    name: gaming-microservices
+EOF
+    fi
+    
+    # Create secrets.yaml
+    if [[ ! -f "kustomize/base/secrets.yaml" ]]; then
+        log "Creating secrets.yaml..."
+        cat > kustomize/base/secrets.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+type: Opaque
+data:
+  # Database credentials
+  DB_USER: cG9zdGdyZXM=  # postgres (base64 encoded)
+  DB_PASSWORD: cG9zdGdyZXMxMjM=  # postgres123 (base64 encoded)
+  # ClickHouse credentials
+  CLICKHOUSE_PASSWORD: ""  # empty password for default user (base64 encoded)
+  # JWT secret
+  JWT_SECRET: eW91ci1qd3Qtc2VjcmV0LWNoYW5nZS10aGlzLWluLXByb2R1Y3Rpb24=  # your-jwt-secret-change-this-in-production (base64 encoded)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "*"
+  LOG_LEVEL: "info"
+  # Database configuration
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "lugx_gaming"
+  # ClickHouse configuration
+  CLICKHOUSE_URL: "http://clickhouse-service:8123"
+  CLICKHOUSE_USER: "default"
+  CLICKHOUSE_USERNAME: "default"
+  CLICKHOUSE_DATABASE: "analytics"
+  # Microservices endpoints
+  GAMING_SERVICE_URL: "http://gaming-service:3001"
+  ORDER_SERVICE_URL: "http://order-service:3002"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:3003"
+  FRONTEND_SERVICE_URL: "http://frontend-service:80"
+  # Rate limiting
+  RATE_LIMIT_WINDOW_MS: "900000"
+  # JWT configuration
+  JWT_EXPIRES_IN: "7d"
+EOF
+    fi
+    
+    # Create postgres.yaml
+    if [[ ! -f "kustomize/base/postgres.yaml" ]]; then
+        log "Creating postgres.yaml..."
+        cat > kustomize/base/postgres.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_NAME
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: DB_PASSWORD
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: postgres-storage
+      volumes:
+      - name: postgres-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+EOF
+    fi
+    
+    # Create clickhouse.yaml
+    if [[ ! -f "kustomize/base/clickhouse.yaml" ]]; then
+        log "Creating clickhouse.yaml..."
+        cat > kustomize/base/clickhouse.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  labels:
+    app: clickhouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+    spec:
+      containers:
+      - name: clickhouse
+        image: clickhouse/clickhouse-server:latest
+        ports:
+        - containerPort: 8123
+        - containerPort: 9000
+        volumeMounts:
+        - mountPath: /var/lib/clickhouse
+          name: clickhouse-storage
+      volumes:
+      - name: clickhouse-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-service
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8123
+    targetPort: 8123
+  - name: native
+    port: 9000
+    targetPort: 9000
+  selector:
+    app: clickhouse
+EOF
+    fi
+    
+    # Create frontend.yaml
+    if [[ ! -f "kustomize/base/frontend.yaml" ]]; then
+        log "Creating frontend.yaml..."
+        cat > kustomize/base/frontend.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend:latest
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: app-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: frontend
+EOF
+    fi
+    
+    # Create gaming-service.yaml
+    if [[ ! -f "kustomize/base/gaming-service.yaml" ]]; then
+        log "Creating gaming-service.yaml..."
+        cat > kustomize/base/gaming-service.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gaming-service
+  labels:
+    app: gaming-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gaming-service
+  template:
+    metadata:
+      labels:
+        app: gaming-service
+    spec:
+      containers:
+      - name: gaming-service
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service:latest
+        ports:
+        - containerPort: 3001
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaming-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3001
+    targetPort: 3001
+  selector:
+    app: gaming-service
+EOF
+    fi
+    
+    # Create order-service.yaml
+    if [[ ! -f "kustomize/base/order-service.yaml" ]]; then
+        log "Creating order-service.yaml..."
+        cat > kustomize/base/order-service.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  labels:
+    app: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service:latest
+        ports:
+        - containerPort: 3002
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3002
+    targetPort: 3002
+  selector:
+    app: order-service
+EOF
+    fi
+    
+    # Create analytics-service.yaml
+    if [[ ! -f "kustomize/base/analytics-service.yaml" ]]; then
+        log "Creating analytics-service.yaml..."
+        cat > kustomize/base/analytics-service.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service:latest
+        ports:
+        - containerPort: 3003
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: app-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3003
+    targetPort: 3003
+  selector:
+    app: analytics-service
+EOF
+    fi
+    
+    # Create ingress.yaml
+    if [[ ! -f "kustomize/base/ingress.yaml" ]]; then
+        log "Creating ingress.yaml..."
+        cat > kustomize/base/ingress.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gaming-microservices-ingress
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+      - path: /api/gaming
+        pathType: Prefix
+        backend:
+          service:
+            name: gaming-service
+            port:
+              number: 3001
+      - path: /api/orders
+        pathType: Prefix
+        backend:
+          service:
+            name: order-service
+            port:
+              number: 3002
+      - path: /api/analytics
+        pathType: Prefix
+        backend:
+          service:
+            name: analytics-service
+            port:
+              number: 3003
+EOF
+    fi
+    
+    # Create network-policy.yaml
+    if [[ ! -f "kustomize/base/network-policy.yaml" ]]; then
+        log "Creating network-policy.yaml..."
+        cat > kustomize/base/network-policy.yaml << 'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gaming-microservices-network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - {}
+  egress:
+  - {}
+EOF
+    fi
+    
+    # Create health-check.yaml
+    if [[ ! -f "kustomize/base/health-check.yaml" ]]; then
+        log "Creating health-check.yaml..."
+        cat > kustomize/base/health-check.yaml << 'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: health-check
+  labels:
+    app: health-check
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: health-check
+  template:
+    metadata:
+      labels:
+        app: health-check
+    spec:
+      containers:
+      - name: health-check
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: health-check-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: health-check
+EOF
+    fi
+    
+    log "All base YAML files created successfully!"
+}
+
+# Create dev overlay kustomization.yaml if missing
+create_dev_overlay_kustomization() {
+    log "Creating dev overlay kustomization.yaml..."
+    cat > kustomize/overlays/dev/kustomization.yaml << 'EOF'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: lugx-gaming
+
+resources:
+- ../../base
+
+patches:
+- path: config-patch.yaml
+
+labels:
+- pairs:
+    environment: development
+    app.kubernetes.io/instance: dev
+
+images:
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend
+  newTag: latest
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service
+  newTag: latest
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service
+  newTag: latest
+- name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service
+  newTag: latest
+
+replicas:
+- name: frontend
+  count: 1
+- name: gaming-service
+  count: 1
+- name: order-service
+  count: 1
+- name: analytics-service
+  count: 1
+EOF
+    log "Dev overlay kustomization.yaml created successfully!"
 }
 
 # Update kustomization with new image tags
@@ -259,29 +824,37 @@ update_kustomization() {
 deploy_to_k8s() {
     log "Deploying to Kubernetes..."
     
-    # Clean the kustomization file of any control characters
-    if command -v dos2unix &> /dev/null; then
-        dos2unix kustomize/base/kustomization.yaml 2>/dev/null || true
+    # Use dev overlay instead of base for deployment
+    local kustomize_path="kustomize/overlays/dev"
+    
+    # Check if dev overlay exists, otherwise fall back to base
+    if [[ ! -d "${kustomize_path}" ]]; then
+        warn "Dev overlay not found, using base kustomization"
+        kustomize_path="kustomize/base"
     fi
     
-    # Remove any control characters manually
-    sed -i 's/[[:cntrl:]]//g' kustomize/base/kustomization.yaml 2>/dev/null || true
-    
     # Validate kustomization before applying
-    log "Validating kustomization..."
-    if ! kustomize build kustomize/base/ > /dev/null; then
-        error "Kustomization validation failed. Please check kustomize/base/kustomization.yaml"
+    log "Validating kustomization at ${kustomize_path}..."
+    if ! kustomize build "${kustomize_path}/" > /dev/null; then
+        error "Kustomization validation failed. Please check ${kustomize_path}/kustomization.yaml"
     fi
     
     # Apply kustomization
-    kubectl apply -k kustomize/base/
+    log "Applying kustomization from ${kustomize_path}..."
+    kubectl apply -k "${kustomize_path}/"
+    
+    # Determine namespace based on overlay or base
+    local deployment_namespace="${NAMESPACE}"
+    if [[ "${kustomize_path}" == "kustomize/overlays/dev" ]]; then
+        deployment_namespace="lugx-gaming"
+    fi
     
     # Wait for rollout
-    log "Waiting for deployments to be ready..."
-    kubectl rollout status deployment/frontend -n ${NAMESPACE} --timeout=300s
-    kubectl rollout status deployment/gaming-service -n ${NAMESPACE} --timeout=300s
-    kubectl rollout status deployment/order-service -n ${NAMESPACE} --timeout=300s
-    kubectl rollout status deployment/analytics-service -n ${NAMESPACE} --timeout=300s
+    log "Waiting for deployments to be ready in namespace ${deployment_namespace}..."
+    kubectl rollout status deployment/frontend -n ${deployment_namespace} --timeout=300s
+    kubectl rollout status deployment/gaming-service -n ${deployment_namespace} --timeout=300s
+    kubectl rollout status deployment/order-service -n ${deployment_namespace} --timeout=300s
+    kubectl rollout status deployment/analytics-service -n ${deployment_namespace} --timeout=300s
     
     log "Deployment completed successfully!"
 }
@@ -290,14 +863,22 @@ deploy_to_k8s() {
 verify_deployment() {
     log "Verifying deployment..."
     
+    # Use the dev overlay namespace if it exists, otherwise use base namespace
+    local deployment_namespace="lugx-gaming"
+    if [[ ! -d "kustomize/overlays/dev" ]]; then
+        deployment_namespace="${NAMESPACE}"
+    fi
+    
+    log "Checking deployment in namespace: ${deployment_namespace}"
+    
     # Check pod status
-    kubectl get pods -n ${NAMESPACE}
+    kubectl get pods -n ${deployment_namespace}
     
     # Check services
-    kubectl get services -n ${NAMESPACE}
+    kubectl get services -n ${deployment_namespace}
     
     # Check ingress
-    kubectl get ingress -n ${NAMESPACE}
+    kubectl get ingress -n ${deployment_namespace} 2>/dev/null || log "No ingress found in namespace ${deployment_namespace}"
     
     log "Deployment verification completed!"
 }

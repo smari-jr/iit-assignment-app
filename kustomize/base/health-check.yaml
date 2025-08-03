@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: health-check-service
+  labels:
+    app: health-check
+spec:
+  selector:
+    app: health-check
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: health-check
+  labels:
+    app: health-check
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: health-check
+  template:
+    metadata:
+      labels:
+        app: health-check
+    spec:
+      containers:
+      - name: health-check
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+        env:
+        - name: GAMING_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: GAMING_SERVICE_URL
+        - name: ORDER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ORDER_SERVICE_URL
+        - name: ANALYTICS_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ANALYTICS_SERVICE_URL
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_HOST
+        - name: CLICKHOUSE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CLICKHOUSE_URL
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: health-check-config
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: health-check-config
+        configMap:
+          name: health-check-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: health-check-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Gaming Microservices Health Check</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .service { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+            .healthy { background-color: #d4edda; }
+            .unhealthy { background-color: #f8d7da; }
+        </style>
+    </head>
+    <body>
+        <h1>Gaming Microservices Health Dashboard</h1>
+        <div class="service">
+            <h3>Service Endpoints</h3>
+            <ul>
+                <li>Gaming Service: gaming-service:3001</li>
+                <li>Order Service: order-service:3002</li>
+                <li>Analytics Service: analytics-service:3003</li>
+                <li>Frontend: frontend-service:80</li>
+                <li>PostgreSQL: postgres-service:5432</li>
+                <li>ClickHouse: clickhouse-service:8123</li>
+            </ul>
+        </div>
+        <div class="service">
+            <h3>Service Communication</h3>
+            <p>All services are configured to communicate via Kubernetes ClusterIP services.</p>
+            <p>Database connections are secured with secrets and configmaps.</p>
+        </div>
+    </body>
+    </html>

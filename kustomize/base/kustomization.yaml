@@ -11,6 +11,8 @@ resources:
   - order-service.yaml
   - analytics-service.yaml
   - ingress.yaml
+  - network-policy.yaml
+  - health-check.yaml
 
 commonLabels:
   app: gaming-microservices

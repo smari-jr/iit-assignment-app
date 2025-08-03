@@ -17,6 +17,22 @@ spec:
         image: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend:latest
         ports:
         - containerPort: 80
+        env:
+        - name: REACT_APP_GAMING_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: GAMING_SERVICE_URL
+        - name: REACT_APP_ORDER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ORDER_SERVICE_URL
+        - name: REACT_APP_ANALYTICS_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ANALYTICS_SERVICE_URL
         resources:
           requests:
             memory: "256Mi"

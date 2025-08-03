@@ -19,30 +19,52 @@ spec:
         - containerPort: 3002
         env:
         - name: NODE_ENV
-          value: "production"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: NODE_ENV
         - name: PORT
           value: "3002"
         - name: DB_HOST
-          value: "postgres-service"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_HOST
         - name: DB_PORT
-          value: "5432"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_PORT
         - name: DB_NAME
-          value: "lugx_gaming"
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DB_NAME
         - name: DB_USER
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
-              key: username
+              name: app-secrets
+              key: DB_USER
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
-              key: password
+              name: app-secrets
+              key: DB_PASSWORD
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-              name: app-secret
-              key: jwt-secret
+              name: app-secrets
+              key: JWT_SECRET
+        - name: GAMING_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: GAMING_SERVICE_URL
+        - name: ANALYTICS_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ANALYTICS_SERVICE_URL
         resources:
           requests:
             memory: "512Mi"

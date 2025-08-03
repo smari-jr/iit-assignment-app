@@ -26,8 +26,8 @@ const pool = new Pool({
 
 // ClickHouse client for analytics data collection
 const clickhouseClient = createClient({
-  url: process.env.CLICKHOUSE_URL || 'http://clickhouse:8123',
-  username: process.env.CLICKHOUSE_USER || 'default',
+  url: `http://${process.env.CLICKHOUSE_HOST || 'clickhouse-service'}:${process.env.CLICKHOUSE_PORT || '8123'}`,
+  username: process.env.CLICKHOUSE_USERNAME || 'default',
   password: process.env.CLICKHOUSE_PASSWORD || '',
   database: process.env.CLICKHOUSE_DATABASE || 'analytics',
   request_timeout: 30000,

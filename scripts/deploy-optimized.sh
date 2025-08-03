@@ -148,16 +148,38 @@ update_kustomization() {
     
     log "Updating kustomization.yaml with new image tags..."
     
-    # Use platform-appropriate sed
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        sed -i '' "s|newTag: v.*|newTag: ${frontend_tag}|g" kustomize/base/kustomization.yaml
-    else
-        # Linux
-        sed -i "s|newTag: v.*|newTag: ${frontend_tag}|g" kustomize/base/kustomization.yaml
-    fi
+    # Create a backup
+    cp kustomize/base/kustomization.yaml kustomize/base/kustomization.yaml.backup
+    
+    # Use awk for more precise replacement
+    awk -v ftag="$frontend_tag" -v gtag="$gaming_tag" -v otag="$order_tag" -v atag="$analytics_tag" '
+    BEGIN { in_images = 0; current_image = "" }
+    /^images:/ { in_images = 1; print; next }
+    in_images && /^- name: / { 
+        if ($3 == "gaming-frontend") current_image = "frontend"
+        else if ($3 == "gaming-service") current_image = "gaming"
+        else if ($3 == "order-service") current_image = "order"
+        else if ($3 == "analytics-service") current_image = "analytics"
+        else current_image = ""
+        print; next
+    }
+    in_images && /^  newTag: / {
+        if (current_image == "frontend") print "  newTag: " ftag
+        else if (current_image == "gaming") print "  newTag: " gtag
+        else if (current_image == "order") print "  newTag: " otag
+        else if (current_image == "analytics") print "  newTag: " atag
+        else print
+        next
+    }
+    /^[^ ]/ && in_images && !/^- name:/ && !/^  / { in_images = 0 }
+    { print }
+    ' kustomize/base/kustomization.yaml.backup > kustomize/base/kustomization.yaml
+    
+    # Remove backup
+    rm kustomize/base/kustomization.yaml.backup
     
     log "Kustomization updated successfully!"
+    log "Updated tags: frontend=${frontend_tag}, gaming=${gaming_tag}, order=${order_tag}, analytics=${analytics_tag}"
 }
 
 # Deploy to Kubernetes

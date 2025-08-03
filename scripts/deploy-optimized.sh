@@ -299,17 +299,53 @@ update_kustomization() {
     # Create a backup of the original file
     cp kustomize/overlays/dev/kustomization.yaml kustomize/overlays/dev/kustomization.yaml.backup
     
-    # Update image tags in the existing kustomization.yaml using sed
-    sed -i.tmp "s|newTag: v[0-9]*-.*|newTag: ${frontend_tag}|" kustomize/overlays/dev/kustomization.yaml
+    # Use a safer approach with awk to update image tags
+    awk -v frontend="$frontend_tag" -v gaming="$gaming_tag" -v order="$order_tag" -v analytics="$analytics_tag" '
+    /- name:.*\/frontend$/ { 
+        print $0
+        getline
+        if ($0 ~ /newTag:/) {
+            print "  newTag: " frontend
+        } else {
+            print $0
+        }
+        next
+    }
+    /- name:.*\/gaming-service$/ { 
+        print $0
+        getline
+        if ($0 ~ /newTag:/) {
+            print "  newTag: " gaming
+        } else {
+            print $0
+        }
+        next
+    }
+    /- name:.*\/order-service$/ { 
+        print $0
+        getline
+        if ($0 ~ /newTag:/) {
+            print "  newTag: " order
+        } else {
+            print $0
+        }
+        next
+    }
+    /- name:.*\/analytics-service$/ { 
+        print $0
+        getline
+        if ($0 ~ /newTag:/) {
+            print "  newTag: " analytics
+        } else {
+            print $0
+        }
+        next
+    }
+    { print $0 }
+    ' kustomize/overlays/dev/kustomization.yaml > kustomize/overlays/dev/kustomization.yaml.new
     
-    # Update each service tag individually
-    sed -i.tmp "/frontend$/,/newTag:/ s/newTag: .*/newTag: ${frontend_tag}/" kustomize/overlays/dev/kustomization.yaml
-    sed -i.tmp "/gaming-service$/,/newTag:/ s/newTag: .*/newTag: ${gaming_tag}/" kustomize/overlays/dev/kustomization.yaml
-    sed -i.tmp "/order-service$/,/newTag:/ s/newTag: .*/newTag: ${order_tag}/" kustomize/overlays/dev/kustomization.yaml
-    sed -i.tmp "/analytics-service$/,/newTag:/ s/newTag: .*/newTag: ${analytics_tag}/" kustomize/overlays/dev/kustomization.yaml
-    
-    # Remove temporary file
-    rm -f kustomize/overlays/dev/kustomization.yaml.tmp
+    # Replace the original file with the updated one
+    mv kustomize/overlays/dev/kustomization.yaml.new kustomize/overlays/dev/kustomization.yaml
     
     # Test kustomize build
     if kustomize build kustomize/overlays/dev/ > /dev/null 2>&1; then

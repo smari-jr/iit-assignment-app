@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClickHouse Analytics Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .demo-section {
+            margin: 25px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .demo-section h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+        }
+        
+        button.test {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        button.test:hover {
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+        
+        button.analytics {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+        
+        button.analytics:hover {
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+        }
+        
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            border-left: 4px solid #ffd700;
+            min-height: 50px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        
+        .loading {
+            color: #ffd700;
+            font-style: italic;
+        }
+        
+        .success {
+            color: #4CAF50;
+        }
+        
+        .error {
+            color: #ff6b6b;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ClickHouse Analytics Demo</h1>
+        
+        <div class="demo-section">
+            <h3>🔧 System Health Checks</h3>
+            <div class="button-group">
+                <button class="test" onclick="testClickHouse()">Test ClickHouse Connection</button>
+                <button class="test" onclick="testPostgreSQL()">Test PostgreSQL Analytics</button>
+                <button onclick="testGamingAPI()">Test Gaming Products</button>
+            </div>
+            <div id="health-result" class="result">Click buttons above to test system connectivity...</div>
+        </div>
+        
+        <div class="demo-section">
+            <h3>📊 Real-Time Analytics Dashboard</h3>
+            <div class="button-group">
+                <button class="analytics" onclick="getClickHouseDashboard()">ClickHouse Dashboard</button>
+                <button class="analytics" onclick="getPostgreSQLDashboard()">PostgreSQL Dashboard</button>
+                <button onclick="compareAnalytics()">Compare Both Systems</button>
+            </div>
+            <div id="analytics-result" class="result">Load analytics dashboards to see real-time data...</div>
+        </div>
+        
+        <div class="demo-section">
+            <h3>💾 Data Generation</h3>
+            <div class="button-group">
+                <button onclick="generateClickHouseData()">Generate ClickHouse Sample Data</button>
+                <button onclick="simulatePageVisits()">Simulate Page Visits</button>
+                <button onclick="simulateUserEvents()">Simulate User Events</button>
+            </div>
+            <div id="data-result" class="result">Generate sample data to see the analytics in action...</div>
+        </div>
+        
+        <div class="demo-section">
+            <h3>🎮 Gaming Integration Demo</h3>
+            <div class="button-group">
+                <button onclick="loadGameProducts()">Load Game Products</button>
+                <button onclick="trackGamePurchase()">Track Purchase Event</button>
+                <button onclick="getGamingAnalytics()">Gaming Analytics</button>
+            </div>
+            <div id="gaming-result" class="result">Test gaming functionality and analytics tracking...</div>
+        </div>
+        
+        <div class="metrics-grid" id="metrics-grid" style="display: none;">
+            <div class="metric-card">
+                <div class="metric-value" id="clickhouse-visits">-</div>
+                <div class="metric-label">ClickHouse Page Visits</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="postgresql-visits">-</div>
+                <div class="metric-label">PostgreSQL Page Visits</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="total-products">-</div>
+                <div class="metric-label">Gaming Products</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="system-uptime">100%</div>
+                <div class="metric-label">System Uptime</div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🏗️ Dual Database Architecture: PostgreSQL (Transactional) + ClickHouse (Analytics)</p>
+            <p>Built for High-Performance Gaming Analytics Platform</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        
+        function showLoading(elementId, message = 'Loading...') {
+            document.getElementById(elementId).innerHTML = `<span class="loading">${message}</span>`;
+        }
+        
+        function showResult(elementId, data, isError = false) {
+            const element = document.getElementById(elementId);
+            const className = isError ? 'error' : 'success';
+            element.innerHTML = `<span class="${className}">${JSON.stringify(data, null, 2)}</span>`;
+        }
+        
+        async function makeRequest(url, method = 'GET', body = null) {
+            try {
+                const options = { method };
+                if (body) {
+                    options.body = JSON.stringify(body);
+                    options.headers = { 'Content-Type': 'application/json' };
+                }
+                
+                const response = await fetch(url, options);
+                const data = await response.json();
+                return { success: true, data };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+        
+        // Health Check Functions
+        async function testClickHouse() {
+            showLoading('health-result', 'Testing ClickHouse connectivity...');
+            const result = await makeRequest(`${API_BASE}/api/analytics/test-clickhouse`);
+            showResult('health-result', result.success ? result.data : result.error, !result.success);
+        }
+        
+        async function testPostgreSQL() {
+            showLoading('health-result', 'Testing PostgreSQL connectivity...');
+            const result = await makeRequest(`${API_BASE}/api/analytics/dashboard`);
+            showResult('health-result', result.success ? { status: 'PostgreSQL Connected', metrics: result.data.metrics } : result.error, !result.success);
+        }
+        
+        async function testGamingAPI() {
+            showLoading('health-result', 'Testing Gaming API...');
+            const result = await makeRequest(`${API_BASE}/api/products`);
+            showResult('health-result', result.success ? { status: 'Gaming API Connected', products: result.data.count } : result.error, !result.success);
+            
+            if (result.success) {
+                document.getElementById('total-products').textContent = result.data.count;
+            }
+        }
+        
+        // Analytics Functions
+        async function getClickHouseDashboard() {
+            showLoading('analytics-result', 'Loading ClickHouse analytics...');
+            const result = await makeRequest(`${API_BASE}/api/analytics/clickhouse-dashboard`);
+            showResult('analytics-result', result.data, !result.success);
+            
+            if (result.success && result.data.metrics) {
+                document.getElementById('clickhouse-visits').textContent = result.data.metrics.page_visits.total_visits || '0';
+                document.getElementById('metrics-grid').style.display = 'grid';
+            }
+        }
+        
+        async function getPostgreSQLDashboard() {
+            showLoading('analytics-result', 'Loading PostgreSQL analytics...');
+            const result = await makeRequest(`${API_BASE}/api/analytics/dashboard`);
+            showResult('analytics-result', result.data, !result.success);
+            
+            if (result.success && result.data.metrics) {
+                document.getElementById('postgresql-visits').textContent = result.data.metrics.page_visits.total_visits || '0';
+                document.getElementById('metrics-grid').style.display = 'grid';
+            }
+        }
+        
+        async function compareAnalytics() {
+            showLoading('analytics-result', 'Comparing both analytics systems...');
+            
+            const [clickhouse, postgresql] = await Promise.all([
+                makeRequest(`${API_BASE}/api/analytics/clickhouse-dashboard`),
+                makeRequest(`${API_BASE}/api/analytics/dashboard`)
+            ]);
+            
+            const comparison = {
+                clickhouse_status: clickhouse.success ? 'Connected' : 'Failed',
+                postgresql_status: postgresql.success ? 'Connected' : 'Failed',
+                clickhouse_visits: clickhouse.success ? clickhouse.data.metrics?.page_visits?.total_visits : 'N/A',
+                postgresql_visits: postgresql.success ? postgresql.data.metrics?.page_visits?.total_visits : 'N/A',
+                performance: 'ClickHouse optimized for high-volume analytics, PostgreSQL for transactional data'
+            };
+            
+            showResult('analytics-result', comparison);
+            document.getElementById('metrics-grid').style.display = 'grid';
+        }
+        
+        // Data Generation Functions
+        async function generateClickHouseData() {
+            showLoading('data-result', 'Generating ClickHouse sample data...');
+            const result = await makeRequest(`${API_BASE}/api/analytics/seed-sample-data`, 'POST');
+            showResult('data-result', result.success ? result.data : result.error, !result.success);
+        }
+        
+        async function simulatePageVisits() {
+            showLoading('data-result', 'Simulating page visits...');
+            
+            const pages = ['/', '/gaming', '/analytics', '/orders'];
+            const devices = ['desktop', 'mobile'];
+            const browsers = ['Chrome', 'Firefox', 'Safari'];
+            
+            const visits = [];
+            for (let i = 0; i < 5; i++) {
+                const visit = {
+                    session_id: `session_${Date.now()}_${i}`,
+                    url: `${API_BASE}${pages[Math.floor(Math.random() * pages.length)]}`,
+                    path: pages[Math.floor(Math.random() * pages.length)],
+                    duration_seconds: Math.floor(Math.random() * 300) + 10,
+                    device_type: devices[Math.floor(Math.random() * devices.length)],
+                    browser: browsers[Math.floor(Math.random() * browsers.length)],
+                    country: 'Demo',
+                    city: 'Virtual'
+                };
+                visits.push(visit);
+            }
+            
+            const results = await Promise.all(
+                visits.map(visit => makeRequest(`${API_BASE}/api/analytics/track/page-visit`, 'POST', visit))
+            );
+            
+            const successCount = results.filter(r => r.success).length;
+            showResult('data-result', { message: `Generated ${successCount} page visits`, visits });
+        }
+        
+        async function simulateUserEvents() {
+            showLoading('data-result', 'Simulating user events...');
+            
+            const events = ['click', 'scroll', 'hover', 'purchase'];
+            const userEvents = [];
+            
+            for (let i = 0; i < 3; i++) {
+                const event = {
+                    session_id: `session_${Date.now()}_${i}`,
+                    event_type: events[Math.floor(Math.random() * events.length)],
+                    event_data: { element: `demo_element_${i}`, value: Math.random() },
+                    page_url: `${API_BASE}/gaming`
+                };
+                userEvents.push(event);
+            }
+            
+            const results = await Promise.all(
+                userEvents.map(event => makeRequest(`${API_BASE}/api/analytics/track/event`, 'POST', event))
+            );
+            
+            const successCount = results.filter(r => r.success).length;
+            showResult('data-result', { message: `Generated ${successCount} user events`, events: userEvents });
+        }
+        
+        // Gaming Functions
+        async function loadGameProducts() {
+            showLoading('gaming-result', 'Loading gaming products...');
+            const result = await makeRequest(`${API_BASE}/api/products`);
+            
+            if (result.success) {
+                const summary = {
+                    total_products: result.data.count,
+                    featured_products: result.data.data.filter(p => p.featured).length,
+                    trending_products: result.data.data.filter(p => p.trending).length,
+                    platforms: [...new Set(result.data.data.map(p => p.platform))],
+                    sample_products: result.data.data.slice(0, 3).map(p => ({ name: p.name, price: p.price, category: p.category }))
+                };
+                showResult('gaming-result', summary);
+                document.getElementById('total-products').textContent = result.data.count;
+            } else {
+                showResult('gaming-result', result.error, true);
+            }
+        }
+        
+        async function trackGamePurchase() {
+            showLoading('gaming-result', 'Tracking purchase event...');
+            
+            const purchaseEvent = {
+                session_id: `purchase_${Date.now()}`,
+                event_type: 'purchase',
+                event_data: {
+                    product_id: '750e8400-e29b-41d4-a716-446655440001',
+                    product_name: 'Call of Duty: Modern Warfare',
+                    price: 39.99,
+                    category: 'action'
+                },
+                page_url: `${API_BASE}/gaming`
+            };
+            
+            const result = await makeRequest(`${API_BASE}/api/analytics/track/event`, 'POST', purchaseEvent);
+            showResult('gaming-result', result.success ? { message: 'Purchase tracked successfully', event: purchaseEvent } : result.error, !result.success);
+        }
+        
+        async function getGamingAnalytics() {
+            showLoading('gaming-result', 'Loading gaming analytics...');
+            const result = await makeRequest(`${API_BASE}/api/analytics/quicksight/gaming-analytics`);
+            showResult('gaming-result', result.success ? result.data : result.error, !result.success);
+        }
+        
+        // Auto-load system status on page load
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                testClickHouse();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

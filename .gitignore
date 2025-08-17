@@ -66,3 +66,16 @@ pids
 
 # Mac files
 .DS_Store
+
+# Backup and temporary files
+*backup*
+*old*
+*.bak
+*.tmp
+*.temp
+
+# Kubernetes secrets
+secrets.yaml
+*.key
+*.pem
+*.crt

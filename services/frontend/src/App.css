@@ -1,7 +1,7 @@
 /* Global App Styles */
 .App {
   min-height: 100vh;
-  background: #f8f9fa;
+  background: #e3f2fd;
 }
 
 .main-content {
@@ -20,7 +20,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #f8f9fa;
+  background: #e3f2fd;
   color: #333;
 }
 
@@ -68,8 +68,8 @@ code {
   display: inline-block;
   width: 20px;
   height: 20px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #3498db;
+  border: 3px solid #e3f2fd;
+  border-top: 3px solid #6f42c1;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -115,15 +115,15 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Selection Color */
+/* Selection Colors */
 ::selection {
-  background: #667eea;
-  color: white;
+  background: #6f42c1;
+  color: #fff;
 }
 
 ::-moz-selection {
-  background: #667eea;
-  color: white;
+  background: #6f42c1;
+  color: #fff;
 }
 
 /* Focus Styles for Accessibility */
@@ -132,7 +132,7 @@ input:focus,
 textarea:focus,
 select:focus,
 a:focus {
-  outline: 2px solid #667eea;
+  outline: 2px solid #007bff;
   outline-offset: 2px;
 }
 
@@ -142,15 +142,15 @@ a:focus {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #e3f2fd;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #6f42c1;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #8e44ad;
 }

@@ -20,8 +20,8 @@ const ENDPOINTS = {
     base: '/api/orders'
   },
   analytics: {
-    dashboard: '/analytics/dashboard',
-    pageVisits: '/analytics/page-visits'
+    dashboard: '/api/analytics/dashboard',
+    pageVisits: '/api/analytics/page-visits'
   }
 };
 

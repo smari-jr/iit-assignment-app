@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mock-data-sql
+  namespace: default
+data:
+  mock-data.sql: |
+    -- Mock Data for LugX Gaming Platform
+    -- This script inserts comprehensive mock data for testing and development
+
+    -- Connect to the database
+    \c app_database;
+
+    -- Clear existing data (in reverse order of dependencies)
+    TRUNCATE TABLE analytics.scroll_events CASCADE;
+    TRUNCATE TABLE analytics.click_events CASCADE;
+    TRUNCATE TABLE analytics.events CASCADE;
+    TRUNCATE TABLE analytics.page_visits CASCADE;
+    TRUNCATE TABLE analytics.session_data CASCADE;
+    TRUNCATE TABLE analytics_events CASCADE;
+    TRUNCATE TABLE wishlist CASCADE;
+    TRUNCATE TABLE shopping_cart CASCADE;
+    TRUNCATE TABLE user_sessions CASCADE;
+    TRUNCATE TABLE order_histories CASCADE;
+    TRUNCATE TABLE reviews CASCADE;
+    TRUNCATE TABLE order_items CASCADE;
+    TRUNCATE TABLE orders CASCADE;
+    TRUNCATE TABLE products CASCADE;
+    TRUNCATE TABLE categories CASCADE;
+    TRUNCATE TABLE users CASCADE;
+
+    -- Insert sample users
+    INSERT INTO users (id, username, email, password_hash, first_name, last_name, phone, date_of_birth, is_active, is_premium, created_at) VALUES
+    ('550e8400-e29b-41d4-a716-446655440001', 'johndoe', 'john.doe@email.com', '$2b$10$K5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZuBqR5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5', 'John', 'Doe', '+1234567890', '1990-05-15', true, false, '2024-01-01 10:00:00'),
+    ('550e8400-e29b-41d4-a716-446655440002', 'janedoe', 'jane.doe@email.com', '$2b$10$K5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZuBqR5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5', 'Jane', 'Doe', '+1234567891', '1985-08-22', true, true, '2024-01-02 11:00:00'),
+    ('550e8400-e29b-41d4-a716-446655440003', 'gamerpro', 'gamer.pro@email.com', '$2b$10$K5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZuBqR5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5', 'Mike', 'Johnson', '+1234567892', '1995-12-10', true, true, '2024-01-03 12:00:00'),
+    ('550e8400-e29b-41d4-a716-446655440004', 'casualplayer', 'casual.player@email.com', '$2b$10$K5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZuBqR5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5', 'Sarah', 'Wilson', '+1234567893', '1992-03-18', true, false, '2024-01-04 13:00:00'),
+    ('550e8400-e29b-41d4-a716-446655440005', 'retroplayer', 'retro.player@email.com', '$2b$10$K5Z5Z5Z5Z5Z5Z5Z5Z5Z5ZuBqR5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5Z5', 'David', 'Brown', '+1234567894', '1988-07-25', true, false, '2024-01-05 14:00:00');
+
+    -- Insert game categories  
+    INSERT INTO categories (id, name, description, image_url, is_active, created_at) VALUES
+    ('650e8400-e29b-41d4-a716-446655440001', 'Action', 'Fast-paced games with combat, adventure, and excitement', '/images/categories/action.jpg', true, '2024-01-01 10:00:00'),
+    ('650e8400-e29b-41d4-a716-446655440002', 'Adventure', 'Story-driven exploration games with rich narratives', '/images/categories/adventure.jpg', true, '2024-01-01 10:05:00'),
+    ('650e8400-e29b-41d4-a716-446655440003', 'RPG', 'Role-playing games with character development and progression', '/images/categories/rpg.jpg', true, '2024-01-01 10:10:00'),
+    ('650e8400-e29b-41d4-a716-446655440004', 'Strategy', 'Tactical and strategic thinking games', '/images/categories/strategy.jpg', true, '2024-01-01 10:15:00'),
+    ('650e8400-e29b-41d4-a716-446655440005', 'Sports', 'Athletic and competitive sports simulations', '/images/categories/sports.jpg', true, '2024-01-01 10:20:00');
+
+    -- Add some sample products
+    INSERT INTO products (id, name, description, price, discounted_price, category_id, image_url, rating, stock_quantity, is_featured, is_active, created_at) VALUES
+    ('750e8400-e29b-41d4-a716-446655440001', 'Call of Duty: Modern Warfare', 'Intense first-person shooter with realistic combat scenarios', 59.99, 39.99, '650e8400-e29b-41d4-a716-446655440001', '/images/products/cod-mw.jpg', 4.5, 100, true, true, '2024-01-01 12:00:00'),
+    ('750e8400-e29b-41d4-a716-446655440002', 'The Legend of Zelda: Breath of the Wild', 'Open-world adventure game with stunning visuals', 49.99, NULL, '650e8400-e29b-41d4-a716-446655440002', '/images/products/zelda-botw.jpg', 4.8, 50, true, true, '2024-01-01 12:05:00'),
+    ('750e8400-e29b-41d4-a716-446655440003', 'Cyberpunk 2077', 'Futuristic RPG set in Night City', 29.99, 19.99, '650e8400-e29b-41d4-a716-446655440003', '/images/products/cyberpunk.jpg', 4.2, 75, false, true, '2024-01-01 12:10:00');
+
+    -- Add some sample orders
+    INSERT INTO orders (id, user_id, total_amount, status, shipping_address, payment_method, created_at) VALUES
+    ('850e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440001', 39.99, 'delivered', '123 Main St, City, State 12345', 'credit_card', '2024-01-15 14:30:00'),
+    ('850e8400-e29b-41d4-a716-446655440002', '550e8400-e29b-41d4-a716-446655440002', 49.99, 'shipped', '456 Oak Ave, Town, State 67890', 'paypal', '2024-01-16 15:45:00');
+
+    -- Add order items
+    INSERT INTO order_items (id, order_id, product_id, quantity, unit_price, total_price) VALUES
+    ('950e8400-e29b-41d4-a716-446655440001', '850e8400-e29b-41d4-a716-446655440001', '750e8400-e29b-41d4-a716-446655440001', 1, 39.99, 39.99),
+    ('950e8400-e29b-41d4-a716-446655440002', '850e8400-e29b-41d4-a716-446655440002', '750e8400-e29b-41d4-a716-446655440002', 1, 49.99, 49.99);
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: psql-client
+  namespace: default
+  labels:
+    app: psql-client
+    purpose: data-migration
+spec:
+  restartPolicy: Never
+  containers:
+  - name: psql-client
+    image: postgres:15-alpine
+    command: ["sleep", "3600"]  # Keep pod running for 1 hour
+    env:
+    - name: PGHOST
+      value: "iit-test-dev-db.cv0gc48uo7w1.ap-southeast-1.rds.amazonaws.com"
+    - name: PGPORT
+      value: "5432"
+    - name: PGDATABASE
+      value: "app_database"
+    - name: PGUSER
+      valueFrom:
+        secretKeyRef:
+          name: app-secrets
+          key: DB_USER
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: app-secrets
+          key: DB_PASSWORD
+    volumeMounts:
+    - name: mock-data-volume
+      mountPath: /scripts
+      readOnly: true
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
+  volumes:
+  - name: mock-data-volume
+    configMap:
+      name: mock-data-sql

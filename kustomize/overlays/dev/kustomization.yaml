@@ -17,13 +17,13 @@ labels:
 
 images:
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/frontend
-  newTag: port-fix-amd64-20250803-235857
+  newTag: gaming-production-20250818
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/gaming-service
   newTag: ssl-fix-20250803-233227
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/order-service
   newTag: ssl-fix-20250803-233400
 - name: 036160411895.dkr.ecr.ap-southeast-1.amazonaws.com/gaming-microservices/analytics-service
-  newTag: clickhouse-url-fixed
+  newTag: clickhouse-production-20250818
 
 replicas:
 - name: frontend

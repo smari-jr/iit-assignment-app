@@ -9,10 +9,11 @@
 .auth-card {
   background: white;
   border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 6px rgba(111, 66, 193, 0.2);
   padding: 2rem;
   width: 100%;
   max-width: 400px;
+  border: 1px solid #e3f2fd;
 }
 
 .auth-card h2 {
@@ -35,23 +36,24 @@
 .form-group input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #ddd;
+  border: 1px solid #6f42c1;
   border-radius: 5px;
   font-size: 1rem;
   transition: border-color 0.3s;
+  background: #f8f9fa;
 }
 
 .form-group input:focus {
   outline: none;
   border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  box-shadow: 0 0 0 2px rgba(111, 66, 193, 0.25);
 }
 
 .auth-button {
   width: 100%;
   padding: 0.75rem;
-  background: #007bff;
-  color: white;
+  background: #6f42c1;
+  color: #fff;
   border: none;
   border-radius: 5px;
   font-size: 1rem;
@@ -61,11 +63,11 @@
 }
 
 .auth-button:hover:not(:disabled) {
-  background: #0056b3;
+  background: #8e44ad;
 }
 
 .auth-button:disabled {
-  background: #6c757d;
+  background: #e3f2fd;
   cursor: not-allowed;
 }
 

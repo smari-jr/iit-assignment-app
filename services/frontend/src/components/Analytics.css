@@ -11,7 +11,7 @@
   align-items: center;
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid #6f42c1;
 }
 
 .analytics-header h2 {
@@ -20,29 +20,30 @@
   font-size: 2rem;
 }
 
-.controls {
+.date-range-selector {
   display: flex;
   gap: 15px;
   align-items: center;
 }
 
-.time-range-select {
+.date-range-select {
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid #6f42c1;
   border-radius: 6px;
   font-size: 1rem;
-  background: white;
+  background: #e3f2fd;
+  color: #333;
 }
 
-.time-range-select:focus {
+.date-range-select:focus {
   outline: none;
   border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  box-shadow: 0 0 0 2px rgba(111, 66, 193, 0.25);
 }
 
 .refresh-btn {
-  background: #007bff;
-  color: white;
+  background: #6f42c1;
+  color: #fff;
   border: none;
   padding: 8px 16px;
   border-radius: 6px;
@@ -52,7 +53,7 @@
 }
 
 .refresh-btn:hover {
-  background: #0056b3;
+  background: #8e44ad;
 }
 
 /* Metrics Grid */
@@ -64,10 +65,11 @@
 }
 
 .metric-card {
-  background: white;
+  background: #fff;
   padding: 25px;
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(111, 66, 193, 0.1);
+  border: 1px solid rgba(111, 66, 193, 0.2);
   display: flex;
   align-items: center;
   gap: 20px;
@@ -76,19 +78,58 @@
 
 .metric-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 25px rgba(111, 66, 193, 0.15);
 }
 
 .metric-icon {
   font-size: 2.5rem;
   padding: 15px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #6f42c1, #007bff);
   border-radius: 50%;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 70px;
-  height: 70px;
+}
+
+/* Loading and Error States */
+.loading-state, .error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.loading-state p, .error-state p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-top: 20px;
+}
+
+.error-message {
+  color: #dc3545;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+}
+
+.retry-btn {
+  background: #6f42c1;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.retry-btn:hover {
+  background: #8e44ad;
 }
 
 .metric-content h3 {
@@ -154,9 +195,122 @@
   position: relative;
 }
 
+/* Analytics Content */
+.analytics-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.analytics-section {
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(111, 66, 193, 0.1);
+  border: 1px solid rgba(111, 66, 193, 0.1);
+}
+
+.analytics-section.full-width {
+  grid-column: 1 / -1;
+}
+
+.analytics-section h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 1.3rem;
+  border-bottom: 2px solid #6f42c1;
+  padding-bottom: 10px;
+}
+
+.top-pages-list, .device-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-item, .device-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #6f42c1;
+}
+
+.page-path, .device-type {
+  font-weight: 500;
+  color: #333;
+}
+
+.page-visits, .device-count {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.no-data {
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  padding: 20px;
+}
+
+/* Table Styles */
+.page-visits-table {
+  overflow-x: auto;
+}
+
+.page-visits-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+.page-visits-table th,
+.page-visits-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.page-visits-table th {
+  background: linear-gradient(135deg, #6f42c1, #007bff);
+  color: #fff;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+}
+
+.page-visits-table td.page-path {
+  font-weight: 500;
+  color: #6f42c1;
+}
+
+.page-visits-table tr:hover {
+  background: #f8f9fa;
+}
+
+/* Data Info */
+.data-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.data-info p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
 .chart-bar {
   flex: 1;
-  background: linear-gradient(135deg, #007bff, #0056b3);
+  background: linear-gradient(135deg, #6f42c1, #007bff);
   border-radius: 4px 4px 0 0;
   min-height: 10px;
   transition: all 0.3s ease;

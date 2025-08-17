@@ -97,7 +97,7 @@ router.post('/track/page-visit', async (req, res) => {
     try {
       const clickhouse = req.app.get('clickhouse');
       await clickhouse.insert({
-        table: 'analytics.page_visits',
+        table: 'page_visits',
         values: [{
           id: visitData.id,
           session_id: visitData.session_id,
@@ -119,7 +119,7 @@ router.post('/track/page-visit', async (req, res) => {
         }],
         format: 'JSONEachRow'
       });
-      console.log('📊 Page visit stored in ClickHouse for analytics');
+      // Page visit stored in ClickHouse for analytics
     } catch (clickhouseError) {
       console.warn('⚠️ ClickHouse insert failed, using PostgreSQL only:', clickhouseError.message);
     }
@@ -199,7 +199,7 @@ router.post('/track/event', async (req, res) => {
     try {
       const clickhouse = req.app.get('clickhouse');
       await clickhouse.insert({
-        table: 'analytics.events',
+        table: 'events',
         values: [{
           id: eventData.id,
           session_id: eventData.session_id,
@@ -217,7 +217,7 @@ router.post('/track/event', async (req, res) => {
         }],
         format: 'JSONEachRow'
       });
-      console.log('📊 Event stored in ClickHouse for analytics');
+      // Event stored in ClickHouse for analytics
     } catch (clickhouseError) {
       console.warn('⚠️ ClickHouse insert failed, using PostgreSQL only:', clickhouseError.message);
     }
@@ -331,7 +331,7 @@ router.post('/track/click', async (req, res) => {
         }],
         format: 'JSONEachRow'
       });
-      console.log('🖱️ Click event stored in ClickHouse for analytics');
+      // Click event stored in ClickHouse for analytics
     } catch (clickhouseError) {
       console.warn('⚠️ ClickHouse insert failed, using PostgreSQL only:', clickhouseError.message);
     }
@@ -441,7 +441,7 @@ router.post('/track/scroll', async (req, res) => {
         }],
         format: 'JSONEachRow'
       });
-      console.log('📜 Scroll event stored in ClickHouse for analytics');
+      // Scroll event stored in ClickHouse for analytics
     } catch (clickhouseError) {
       console.warn('⚠️ ClickHouse insert failed, using PostgreSQL only:', clickhouseError.message);
     }
@@ -562,7 +562,7 @@ router.post('/track/session', async (req, res) => {
         }],
         format: 'JSONEachRow'
       });
-      console.log('⏱️ Session data stored in ClickHouse for analytics');
+      // Session data stored in ClickHouse for analytics
     } catch (clickhouseError) {
       console.warn('⚠️ ClickHouse insert failed, using PostgreSQL only:', clickhouseError.message);
     }
@@ -838,7 +838,7 @@ router.post('/seed-sample-data', async (req, res) => {
     
     // Insert into ClickHouse
     await clickhouse.insert({
-      table: 'analytics.page_visits',
+      table: 'page_visits',
       values: sampleData,
       format: 'JSONEachRow'
     });
@@ -912,7 +912,7 @@ router.post('/seed-sample-data', async (req, res) => {
     
     // Insert events into ClickHouse
     await clickhouse.insert({
-      table: 'analytics.events',
+      table: 'events',
       values: sampleEvents,
       format: 'JSONEachRow'
     });
@@ -1461,6 +1461,133 @@ router.get('/quicksight/scroll-analytics', async (req, res) => {
     console.error('Error getting scroll analytics:', error);
     res.status(500).json({
       error: 'Failed to retrieve scroll analytics',
+      message: error.message
+    });
+  }
+});
+
+// Test ClickHouse connectivity
+router.get('/test-clickhouse', async (req, res) => {
+  try {
+    const clickhouse = req.app.get('clickhouse');
+    
+    // Test ClickHouse connection
+    await clickhouse.ping();
+    
+    // Query data from ClickHouse
+    const result = await clickhouse.query({
+      query: 'SELECT COUNT(*) as count FROM page_visits',
+      format: 'JSONEachRow'
+    });
+    
+    const data = await result.json();
+    
+    res.json({
+      status: 'success',
+      clickhouse_connected: true,
+      page_visits_count: data[0]?.count || 0,
+      message: 'ClickHouse is working correctly!'
+    });
+    
+  } catch (error) {
+    console.error('ClickHouse test failed:', error);
+    res.status(500).json({
+      status: 'error',
+      clickhouse_connected: false,
+      error: error.message
+    });
+  }
+});
+
+// ClickHouse analytics dashboard - real-time analytics data
+router.get('/clickhouse-dashboard', async (req, res) => {
+  try {
+    const clickhouse = req.app.get('clickhouse');
+    
+    // Get page visits statistics
+    const pageVisitsResult = await clickhouse.query({
+      query: `
+        SELECT 
+          COUNT(*) as total_visits,
+          COUNT(DISTINCT session_id) as unique_sessions,
+          AVG(duration_seconds) as avg_duration
+        FROM page_visits
+      `,
+      format: 'JSONEachRow'
+    });
+    const pageVisitsData = await pageVisitsResult.json();
+    
+    // Get top pages
+    const topPagesResult = await clickhouse.query({
+      query: `
+        SELECT path, COUNT(*) as visits 
+        FROM page_visits 
+        GROUP BY path 
+        ORDER BY visits DESC 
+        LIMIT 10
+      `,
+      format: 'JSONEachRow'
+    });
+    const topPagesData = await topPagesResult.json();
+    
+    // Get device breakdown
+    const deviceResult = await clickhouse.query({
+      query: `
+        SELECT device_type, COUNT(*) as count 
+        FROM page_visits 
+        WHERE device_type != '' 
+        GROUP BY device_type
+      `,
+      format: 'JSONEachRow'
+    });
+    const deviceData = await deviceResult.json();
+    
+    // Get browser breakdown
+    const browserResult = await clickhouse.query({
+      query: `
+        SELECT browser, COUNT(*) as count 
+        FROM page_visits 
+        WHERE browser != '' 
+        GROUP BY browser 
+        ORDER BY count DESC
+      `,
+      format: 'JSONEachRow'
+    });
+    const browserData = await browserResult.json();
+    
+    // Get geographic data
+    const geoResult = await clickhouse.query({
+      query: `
+        SELECT country, city, COUNT(*) as visits 
+        FROM page_visits 
+        WHERE country != '' 
+        GROUP BY country, city 
+        ORDER BY visits DESC 
+        LIMIT 10
+      `,
+      format: 'JSONEachRow'
+    });
+    const geoData = await geoResult.json();
+    
+    res.json({
+      source: 'ClickHouse',
+      timestamp: new Date().toISOString(),
+      metrics: {
+        page_visits: pageVisitsData[0] || { total_visits: 0, unique_sessions: 0, avg_duration: 0 },
+      },
+      breakdowns: {
+        top_pages: topPagesData,
+        device_types: deviceData,
+        browsers: browserData,
+        geographic: geoData
+      },
+      message: 'Real-time analytics powered by ClickHouse!'
+    });
+    
+  } catch (error) {
+    console.error('ClickHouse dashboard error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve ClickHouse analytics',
       message: error.message
     });
   }

@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const promMiddleware = require('express-prometheus-middleware');
 const { createClient } = require('@clickhouse/client');
 const { Pool } = require('pg');
+const path = require('path');
 require('dotenv').config();
 
 const analyticsRoutes = require('./routes/analytics');
@@ -28,12 +29,14 @@ const pool = new Pool({
 });
 
 // ClickHouse client for analytics data collection
+console.log(`🔗 Connecting to ClickHouse at: http://${process.env.CLICKHOUSE_HOST || 'clickhouse-service'}:${process.env.CLICKHOUSE_PORT || '8123'}`);
 const clickhouseClient = createClient({
-  url: `http://${process.env.CLICKHOUSE_HOST || 'clickhouse-service'}:${process.env.CLICKHOUSE_PORT || '8123'}`,
+  host: `http://${process.env.CLICKHOUSE_HOST || 'clickhouse-service'}:${process.env.CLICKHOUSE_PORT || '8123'}`,
   username: process.env.CLICKHOUSE_USERNAME || 'default',
   password: process.env.CLICKHOUSE_PASSWORD || '',
-  database: process.env.CLICKHOUSE_DATABASE || 'analytics',
+  database: process.env.CLICKHOUSE_DATABASE || 'analytics_dev',
   request_timeout: 30000,
+  max_open_connections: 10,
   clickhouse_settings: {
     async_insert: 1,
     wait_for_async_insert: 0
@@ -105,6 +108,15 @@ app.get('/ready', async (req, res) => {
 });
 
 // Routes
+// Demo page route
+app.get('/demo', (req, res) => {
+  res.sendFile(path.join(__dirname, 'demo', 'clickhouse-demo.html'));
+});
+
+app.get('/api/demo', (req, res) => {
+  res.sendFile(path.join(__dirname, 'demo', 'clickhouse-demo.html'));
+});
+
 app.use('/analytics', analyticsRoutes);
 app.use('/api/analytics', analyticsRoutes); // Add support for ALB routing
 

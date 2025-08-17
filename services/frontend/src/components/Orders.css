@@ -10,7 +10,7 @@
   align-items: center;
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 2px solid #e0e0e0;
+  border-bottom: 2px solid #6f42c1;
 }
 
 .orders-header h2 {
@@ -25,8 +25,8 @@
 }
 
 .cart-btn {
-  background: linear-gradient(135deg, #007bff, #0056b3);
-  color: white;
+  background: linear-gradient(135deg, #6f42c1, #007bff);
+  color: #333;
   border: none;
   padding: 12px 20px;
   border-radius: 8px;
@@ -40,7 +40,7 @@
 }
 
 .cart-btn:disabled {
-  background: #ccc;
+  background: #fff3cd;
   cursor: not-allowed;
   transform: none;
 }
@@ -115,11 +115,11 @@
 
 .item-total {
   font-weight: bold;
-  color: #007bff;
+  color: #ff8f00;
 }
 
 .remove-btn {
-  background: #dc3545;
+  background: #ff6f00;
   color: white;
   border: none;
   padding: 5px 10px;
@@ -129,7 +129,7 @@
 }
 
 .remove-btn:hover {
-  background: #c82333;
+  background: #e65100;
 }
 
 .cart-total {
@@ -137,8 +137,9 @@
   font-size: 1.2rem;
   margin: 20px 0;
   padding: 15px;
-  background: #e9ecef;
+  background: #fff8e1;
   border-radius: 8px;
+  border: 1px solid #6f42c1;
 }
 
 /* Shipping Form */
@@ -203,7 +204,7 @@
 }
 
 .clear-cart-btn {
-  background: #ffc107;
+  background: #6f42c1;
   color: #212529;
   border: none;
   padding: 12px 24px;
